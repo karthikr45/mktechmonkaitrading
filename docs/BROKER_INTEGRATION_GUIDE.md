@@ -1,0 +1,2 @@
+# Broker integration guide
+PaperBroker supplies deterministic immediate limit-price fills only after approval and acknowledgment. Fill identity is tenant/order scoped. Breeze, Angel SmartAPI and FYERS are explicitly unavailable stubs, not implemented official API integrations. Next steps: verify official broker authentication, capability and rate-limit documentation; implement secret-provider interfaces; mock HTTP/WebSocket contract tests; then sandbox verification. No automated test may place a real order. Never persist tokens in source, URLs or logs.

@@ -1,0 +1,41 @@
+{
+  "tasks": {
+    "build": {
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": []
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "typecheck": {
+      "dependsOn": [
+        "^typecheck"
+      ]
+    },
+    "@mk/api#build": {
+      "outputs": [
+        "dist/**"
+      ]
+    },
+    "@mk/web#build": {
+      "outputs": [
+        ".next/**",
+        ".next-test/**",
+        "!.next/cache/**",
+        "!.next-test/cache/**"
+      ]
+    }
+  },
+  "globalEnv": [
+    "API_URL",
+    "NEXT_DIST_DIR"
+  ],
+  "globalDependencies": [
+    "tsconfig.json",
+    "packages/tsconfig/base.json",
+    "packages/**/src/**"
+  ]
+}

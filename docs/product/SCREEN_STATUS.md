@@ -1,0 +1,2 @@
+# Screen status
+Working: overview, paper terminal, orders/trades list, risk kill switch, audit history, provider statuses, and a FastAPI-backed research backtest screen. Light/dark and responsive layouts included. Shared loading/API error and initial empty state implemented. Full permission-denied/stale-data state coverage is pending. All remaining screens in the product brief are pending; they are intentionally absent from navigation until functional.

@@ -1,0 +1,2 @@
+# Model governance
+No predictive model is trained or active in this build. Planned states: experimental → evaluated → approved → active → retired, with rejected as a terminal decision. Require chronological train/validation/test splits, embargo for overlapping labels, cost-aware performance, calibration/Brier score, regime stability, SHAP reports and independent approval. Training performance alone cannot authorize activation. AI must only draft/explain, never call a broker.

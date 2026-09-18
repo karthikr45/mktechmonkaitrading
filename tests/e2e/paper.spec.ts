@@ -1,0 +1,2 @@
+import {test,expect} from '@playwright/test';
+test('paper order risk review and approval',async({page})=>{await page.goto('/');await expect(page.getByText('Available paper funds')).toBeVisible();await page.getByRole('button',{name:'New paper order'}).click();await page.getByRole('button',{name:'Submit for risk review'}).click();await expect(page.getByText('pending approval',{exact:true})).toBeVisible();await page.getByRole('button',{name:'Approve paper fill'}).click();await expect(page.getByText('filled',{exact:true})).toBeVisible();});

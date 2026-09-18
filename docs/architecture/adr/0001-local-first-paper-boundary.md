@@ -1,0 +1,2 @@
+# ADR 0001: Local-first paper boundary
+Accepted. Use a TypeScript modular monorepo and stateless Python analytics. Deliver a reversible local paper slice before durable/live execution. Favor explicit unavailable integrations over simulated success. In-memory persistence is temporary and blocks production use. Native PostgreSQL partitions are the default fallback; pgvector is required in the local DB image.

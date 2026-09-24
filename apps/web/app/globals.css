@@ -526,3 +526,57 @@ textarea {
 .journalNote p {
   line-height: 1.6;
 }
+
+.researchCentre {
+  display: grid;
+  gap: 20px;
+}
+.researchCentre .panel {
+  min-width: 0;
+}
+.researchCentre p {
+  line-height: 1.65;
+}
+.researchCentre a {
+  color: var(--accent, #73daca);
+  text-decoration: underline;
+}
+.researchCentre textarea {
+  width: 100%;
+  min-height: 100px;
+}
+.researchCentre input:not([type="checkbox"]),
+.researchCentre select {
+  display: block;
+  width: 100%;
+  margin: 8px 0;
+}
+.researchCentre textarea,
+.researchCentre select {
+  background: var(--bg, #101923);
+  color: inherit;
+  border: 1px solid #43505f;
+  border-radius: 8px;
+  padding: 10px;
+}
+.researchFields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin: 18px 0;
+}
+.researchCard {
+  padding: 16px 0;
+  border-bottom: 1px solid #43505f55;
+  overflow-wrap: anywhere;
+}
+.researchCard button {
+  margin-top: 10px;
+}
+.researchCentre details {
+  margin: 16px 0;
+}
+.researchCentre summary {
+  cursor: pointer;
+  font-weight: 600;
+}

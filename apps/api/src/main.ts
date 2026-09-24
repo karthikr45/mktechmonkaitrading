@@ -23,6 +23,8 @@ import {
 import type { Request, Response } from "express";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
+import { NewsRiskService } from "./news-risk/service";
+import { projectRisk } from "./news-risk/contracts";
 import { sse } from "./market-stream";
 import { UpstoxFeed } from "./upstox/feed";
 import { LocalStore } from "./persistence";
@@ -40,6 +42,7 @@ function upstox(tenantId: string) {
   }
   return feed;
 }
+const newsRisk = new NewsRiskService(store, upstox);
 function token(req: Request) {
   return req.headers.authorization?.replace(/^Bearer /, "") ?? "";
 }
@@ -227,6 +230,61 @@ class Api {
         checking = false;
       }
     }, 1000);
+  }
+  @Get("trader/alerts-status") async traderAlertsStatus(@Req() req: Request) {
+    const t = await tenant(req);
+    return store.scoped(t, async (m) => {
+      const [row] = await m.query(
+        "SELECT count(*)::int AS count,count(*) FILTER(WHERE severity='critical')::int AS critical FROM trader_alerts WHERE tenant_id=$1 AND acknowledged_at IS NULL AND resolved_at IS NULL",
+        [t],
+      );
+      return row;
+    });
+  }
+  @Get("trader/briefings/:id") async traderBriefing(
+    @Req() req: Request,
+    @Param("id") id: string,
+  ) {
+    return validated(async () => newsRisk.briefing(await tenant(req), id));
+  }
+  @Get("trader") async traderState(@Req() req: Request) {
+    return validated(async () => newsRisk.state(await tenant(req)));
+  }
+  @Post("trader/settings") async traderSettings(
+    @Req() req: Request,
+    @Body() body: unknown,
+  ) {
+    return validated(async () =>
+      newsRisk.saveSettings(await tenant(req), body),
+    );
+  }
+  @Post("trader/refresh") async traderRefresh(@Req() req: Request) {
+    return validated(async () => newsRisk.refresh(await tenant(req), true));
+  }
+  @Post("trader/checklist") async traderChecklist(
+    @Req() req: Request,
+    @Body() body: unknown,
+  ) {
+    return validated(async () => newsRisk.check(await tenant(req), body));
+  }
+  @Post("trader/alerts/:id/acknowledge") async traderAcknowledge(
+    @Req() req: Request,
+    @Param("id") id: string,
+  ) {
+    return validated(async () => newsRisk.acknowledge(await tenant(req), id));
+  }
+  @Post("trader/risk-plan") async traderRisk(
+    @Req() req: Request,
+    @Body() body: unknown,
+  ) {
+    await tenant(req);
+    try {
+      return projectRisk(body);
+    } catch {
+      throw new BadRequestException(
+        "Enter positive prices and budget, a valid quantity, and stop/target on the correct sides of entry.",
+      );
+    }
   }
   @Get("dashboard") async dashboard(@Req() req: Request) {
     return store.snapshot(await tenant(req));
@@ -439,7 +497,9 @@ async function main() {
     Number(process.env.PORT ?? process.env.API_PORT ?? 4200),
     "127.0.0.1",
   );
+  newsRisk.start();
   const shutdown = async () => {
+    newsRisk.stop();
     for (const feed of upstoxFeeds.values()) feed.disconnect();
     await app.close();
     await store.close();

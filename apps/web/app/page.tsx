@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import NewsRiskPanel from "./NewsRiskPanel";
 import RealtimePanel from "./RealtimePanel";
 import LocalPanels from "./LocalPanels";
 import {
@@ -36,6 +37,7 @@ type Snapshot = {
 const tabs = [
   "Overview",
   "Real-time market",
+  "News & risk",
   "Paper terminal",
   "Orders & trades",
   "Risk controls",
@@ -51,6 +53,10 @@ const tabs = [
 ];
 export default function Page() {
   const [tab, setTab] = useState("Overview");
+  const [alertStatus, setAlertStatus] = useState<{
+    count: number;
+    critical: number;
+  }>();
   const [token, setToken] = useState("");
   const [data, setData] = useState<Snapshot>();
   const [error, setError] = useState("");
@@ -64,6 +70,29 @@ export default function Page() {
     trades: { index: number; side: string; price: string; fee: string }[];
     warnings: string[];
   }>();
+  useEffect(() => {
+    if (!token) return;
+    let active = true;
+    const check = async () => {
+      try {
+        const r = await fetch("/api/trader/alerts-status", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (r.ok) {
+          const value = await r.json();
+          if (active) setAlertStatus(value);
+        } else if (active) setAlertStatus(undefined);
+      } catch {
+        if (active) setAlertStatus(undefined);
+      }
+    };
+    void check();
+    const timer = setInterval(() => void check(), 30000);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [token]);
   async function api(path: string, method = "GET", body?: unknown, t = token) {
     const response = await fetch("/api/" + path, {
       method,
@@ -148,6 +177,7 @@ export default function Page() {
             const Icon = [
               Activity,
               Radio,
+              BookOpen,
               ChartNoAxesCombined,
               Layers,
               ShieldCheck,
@@ -187,7 +217,7 @@ export default function Page() {
           </span>
           <div>
             <span className="pill">
-              {tab === "Real-time market"
+              {["Real-time market", "News & risk"].includes(tab)
                 ? "UPSTOX · PAPER EXECUTION"
                 : "● SIMULATION"}
             </span>
@@ -216,12 +246,22 @@ export default function Page() {
           <div className="notice">
             <Radio size={16} />
             <span>
-              {tab === "Real-time market"
+              {["Real-time market", "News & risk"].includes(tab)
                 ? "Upstox market data · Native PostgreSQL · Live quotes require a connected account"
                 : "Synthetic replay · Native PostgreSQL · Historical simulation clock · Not live exchange data"}
             </span>
             <span className="right">PAPER ONLY</span>
           </div>
+          <button
+            onClick={() => setTab("News & risk")}
+            aria-live="polite"
+            style={{ marginBottom: 16 }}
+          >
+            {alertStatus
+              ? `${alertStatus.count} unacknowledged research/risk alerts · ${alertStatus.critical} critical`
+              : "Research alert status unavailable"}{" "}
+            — Open News & risk
+          </button>
           {error && (
             <div role="alert" className="error">
               {error}
@@ -239,7 +279,9 @@ export default function Page() {
                   className="stats"
                   hidden={tab === "Real-time market"}
                   style={
-                    tab === "Real-time market" ? { display: "none" } : undefined
+                    ["Real-time market", "News & risk"].includes(tab)
+                      ? { display: "none" }
+                      : undefined
                   }
                 >
                   {[
@@ -273,6 +315,7 @@ export default function Page() {
                     </div>
                   ))}
                 </div>
+                {tab === "News & risk" && <NewsRiskPanel token={token} />}
                 {tab === "Real-time market" && <RealtimePanel token={token} />}
                 {tab === "Overview" && (
                   <div className="grid">

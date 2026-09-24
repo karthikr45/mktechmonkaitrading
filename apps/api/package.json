@@ -13,6 +13,7 @@
     "@nestjs/platform-express": "^11.1.6",
     "@nestjs/swagger": "^11.2.0",
     "decimal.js": "^10.6.0",
+    "fast-xml-parser": "^5.11.1",
     "pg": "^8.23.0",
     "protobufjs": "^8.8.0",
     "reflect-metadata": "^0.2.2",

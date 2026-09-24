@@ -110,3 +110,7 @@ Real market and news verification will require the relevant accounts and data en
 ## September 18 update: Upstox first broker
 
 User selected Upstox as the first live market-data provider. Added authenticated market-stream UI and a V3 LTPC adapter with official Protobuf decoding, subscriptions, shared upstream socket, stale-data labels, market status, reconnect/resubscribe, token rejection handling and disconnect. Broker credentials stay server-side. Status: **implemented with mocked protocol verification; actual Upstox account verification pending credentials**. This does not complete broker execution, OAuth, tick persistence, instrument search, full market-data coverage or the overall platform. See `UPSTOX_LOCAL.md`.
+
+## September 24 update: News & Risk Centre
+
+Added a local background research scheduler, persistent alert inbox with global unread counter, daily checklist/review notes, watchlist preferences, Upstox news/key-ratio adapters, NSE/Moneycontrol RSS ingestion with freshness checks, local Ollama evidence-linked summary gateway, and decimal equity risk worksheet. Native PostgreSQL persistence and tenant isolation are integration-tested. Public NSE feed returned current items; Moneycontrol business RSS returned 2024 articles and is explicitly excluded as stale. AI generation and credential-dependent Upstox research remain configuration/acceptance-dependent. Full fundamental analysis, live portfolio risk, calendar verification and external notification delivery remain incomplete. See `NEWS_RISK_CENTRE.md`.

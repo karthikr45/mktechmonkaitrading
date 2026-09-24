@@ -23,7 +23,8 @@
     "test:db": "pnpm --filter @mk/api exec tsx src/check-persistence.ts",
     "status:local": "node scripts/status-local.mjs",
     "test:analytics": "cd apps/analytics && .venv/bin/python -m pytest && .venv/bin/ruff check analytics tests",
-    "test:market": "tsx scripts/check-market.ts"
+    "test:market": "tsx scripts/check-market.ts",
+    "test:research": "pnpm --filter @mk/api exec tsx src/check-news-risk.ts"
   },
   "devDependencies": {
     "@playwright/test": "^1.55.0",

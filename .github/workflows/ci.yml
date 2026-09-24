@@ -22,7 +22,7 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm db:migrate && pnpm test:db
+      - run: pnpm db:migrate && pnpm test:db && pnpm test:research
       - run: pnpm lint && pnpm typecheck && pnpm test && pnpm build
       - uses: actions/setup-python@v5
         with:

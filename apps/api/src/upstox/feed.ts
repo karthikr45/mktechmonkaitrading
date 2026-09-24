@@ -97,6 +97,28 @@ export class UpstoxFeed {
         }),
     },
   ) {}
+  async researchRequest(
+    path: string,
+    fallbackToken?: string,
+  ): Promise<unknown> {
+    if (!/^\/v2\/(news\?|fundamentals\/[A-Z0-9]{12}\/key-ratios$)/.test(path))
+      throw new Error("Unsupported research path");
+    const credential = this.accessToken || fallbackToken;
+    if (!credential) throw new Error("Upstox token is not configured");
+    const response = await this.dependencies.fetch(
+      `https://api.upstox.com${path}`,
+      {
+        headers: {
+          Authorization: `Bearer ${credential}`,
+          Accept: "application/json",
+        },
+        redirect: "error",
+        signal: AbortSignal.timeout(12000),
+      },
+    );
+    const { boundedBody } = await import("../news-risk/providers");
+    return JSON.parse(await boundedBody(response));
+  }
   status() {
     return {
       state: this.state,

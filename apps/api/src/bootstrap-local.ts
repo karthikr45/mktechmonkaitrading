@@ -1,7 +1,13 @@
 import "reflect-metadata";
 import { DataSource } from "typeorm";
 import { randomBytes } from "node:crypto";
-import { readFileSync, writeFileSync, existsSync, chmodSync } from "node:fs";
+import {
+  readFileSync,
+  writeFileSync,
+  existsSync,
+  chmodSync,
+  readdirSync,
+} from "node:fs";
 import { resolve } from "node:path";
 import { userInfo } from "node:os";
 import { repositoryRoot } from "./local-config";
@@ -50,12 +56,12 @@ async function setup() {
   await migration.initialize();
   try {
     await migration.transaction(async (manager) => {
-      await manager.query(
-        readFileSync(
-          resolve(root, "infra/local/migrations/001-persistent-paper.sql"),
-          "utf8",
-        ),
-      );
+      const directory = resolve(root, "infra/local/migrations");
+      for (const filename of readdirSync(directory)
+        .filter((name) => /^\d+.*\.sql$/.test(name))
+        .sort()) {
+        await manager.query(readFileSync(resolve(directory, filename), "utf8"));
+      }
       await manager.query(
         "GRANT CONNECT ON DATABASE mktechmonk_local TO mktechmonk_app",
       );

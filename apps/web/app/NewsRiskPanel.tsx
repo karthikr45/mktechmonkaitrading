@@ -47,6 +47,15 @@ type State = {
   latest?: {
     created_at: string;
     report: {
+      global?: {
+        checkedAt: string;
+        regions: {
+          group: string;
+          status: string;
+          available: number;
+          total: number;
+        }[];
+      };
       evidence?: Article[];
       summary: string;
       coverage: {
@@ -387,6 +396,23 @@ export default function NewsRiskPanel({ token }: { token: string }) {
           </button>
         )}
         <p>{report?.summary ?? "No briefing saved yet."}</p>
+        {report?.global && (
+          <details>
+            <summary>Global context saved with this briefing</summary>
+            <p>
+              Snapshot{" "}
+              {new Date(report.global.checkedAt).toLocaleString("en-IN", {
+                timeZone: "Asia/Kolkata",
+              })}{" "}
+              IST · historical evidence, not current quotes
+            </p>
+            {report.global.regions.map((r) => (
+              <p key={r.group}>
+                {r.group}: {r.status} ({r.available}/{r.total})
+              </p>
+            ))}
+          </details>
+        )}
         <small>
           {data.latest ? `Retrieved ${when(data.latest.created_at)} IST` : ""}
         </small>

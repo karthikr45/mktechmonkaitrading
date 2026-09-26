@@ -23,6 +23,7 @@ import {
 import type { Request, Response } from "express";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
+import { GlobalMarkets } from "./global-markets/service";
 import { NewsRiskService } from "./news-risk/service";
 import { projectRisk } from "./news-risk/contracts";
 import { sse } from "./market-stream";
@@ -42,7 +43,8 @@ function upstox(tenantId: string) {
   }
   return feed;
 }
-const newsRisk = new NewsRiskService(store, upstox);
+const globalMarkets = new GlobalMarkets();
+const newsRisk = new NewsRiskService(store, upstox, globalMarkets);
 function token(req: Request) {
   return req.headers.authorization?.replace(/^Bearer /, "") ?? "";
 }
@@ -75,6 +77,10 @@ async function validated<T>(fn: () => Promise<T>) {
 @ApiBearerAuth()
 @Controller("v1")
 class Api {
+  @Get("global-markets") async global(@Req() req: Request) {
+    await tenant(req);
+    return globalMarkets.state();
+  }
   @Get("health") async health() {
     try {
       return await store.health();

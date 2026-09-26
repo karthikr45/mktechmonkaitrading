@@ -1,17 +1,17 @@
 "use client";
 import { useEffect, useState } from "react";
+import GlobalOutlook from "./GlobalOutlook";
 import NewsRiskPanel from "./NewsRiskPanel";
 import RealtimePanel from "./RealtimePanel";
 import LocalPanels from "./LocalPanels";
 import {
   Activity,
+  Layers,
   ChartNoAxesCombined,
   ShieldCheck,
-  Layers,
   BookOpen,
   Radio,
   Settings,
-  FlaskConical,
   ArrowUpRight,
   OctagonPause,
 } from "lucide-react";
@@ -35,7 +35,8 @@ type Snapshot = {
   brokers: { name: string; status: string }[];
 };
 const tabs = [
-  "Overview",
+  "Today",
+  "Global markets",
   "Real-time market",
   "News & risk",
   "Paper terminal",
@@ -52,7 +53,7 @@ const tabs = [
   "System health",
 ];
 export default function Page() {
-  const [tab, setTab] = useState("Overview");
+  const [tab, setTab] = useState("Today");
   const [alertStatus, setAlertStatus] = useState<{
     count: number;
     critical: number;
@@ -62,6 +63,7 @@ export default function Page() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [quantity, setQuantity] = useState(1);
+  const [advanced, setAdvanced] = useState(false);
   const [light, setLight] = useState(false);
   const [research, setResearch] = useState<{
     returnPct: string;
@@ -173,35 +175,42 @@ export default function Page() {
         </div>
         <p className="navlabel">WORKSPACE</p>
         <nav>
-          {tabs.map((x, i) => {
-            const Icon = [
-              Activity,
-              Radio,
-              BookOpen,
-              ChartNoAxesCombined,
-              Layers,
-              ShieldCheck,
-              BookOpen,
-              Radio,
-              FlaskConical,
-              Layers,
-              BookOpen,
-              FlaskConical,
-              BookOpen,
-              Layers,
-              Activity,
-            ][i];
-            return (
-              <button
-                key={x}
-                onClick={() => setTab(x)}
-                className={tab === x ? "selected" : ""}
-              >
-                <Icon size={18} />
-                {x}
-              </button>
-            );
-          })}
+          {tabs
+            .filter(
+              (x) =>
+                advanced ||
+                [
+                  "Today",
+                  "Global markets",
+                  "Real-time market",
+                  "News & risk",
+                  "Trade journal",
+                ].includes(x),
+            )
+            .map((x) => {
+              const Icon =
+                x === "Today"
+                  ? Activity
+                  : x === "Global markets"
+                    ? ChartNoAxesCombined
+                    : BookOpen;
+              return (
+                <button
+                  key={x}
+                  onClick={() => setTab(x)}
+                  className={tab === x ? "selected" : ""}
+                >
+                  <Icon size={18} />
+                  {x}
+                </button>
+              );
+            })}
+          <button
+            onClick={() => setAdvanced(!advanced)}
+            aria-expanded={advanced}
+          >
+            {advanced ? "Hide" : "Show"} paper trading & tools
+          </button>
         </nav>
         <div className="asideBottom">
           <ShieldCheck size={19} />
@@ -217,8 +226,13 @@ export default function Page() {
           </span>
           <div>
             <span className="pill">
-              {["Real-time market", "News & risk"].includes(tab)
-                ? "UPSTOX · PAPER EXECUTION"
+              {[
+                "Today",
+                "Global markets",
+                "Real-time market",
+                "News & risk",
+              ].includes(tab)
+                ? "RESEARCH · PAPER EXECUTION"
                 : "● SIMULATION"}
             </span>
             <button onClick={() => setLight(!light)} aria-label="Toggle theme">
@@ -231,23 +245,31 @@ export default function Page() {
           <div className="heading">
             <div>
               <p className="eyebrow">YOUR MARKET. YOUR EDGE.</p>
-              <h1>{tab === "Overview" ? "Market overview" : tab}</h1>
+              <h1>{tab === "Today" ? "Today’s trading brief" : tab}</h1>
               <p className="muted">
                 A clear view of the market, with risk at the centre.
               </p>
             </div>
             <button
               className="primary"
-              onClick={() => setTab("Paper terminal")}
+              onClick={() =>
+                setTab(tab === "Today" ? "News & risk" : "Paper terminal")
+              }
             >
-              New paper order <ArrowUpRight size={16} />
+              {tab === "Today" ? "Review my day" : "New paper order"}{" "}
+              <ArrowUpRight size={16} />
             </button>
           </div>
           <div className="notice">
             <Radio size={16} />
             <span>
-              {["Real-time market", "News & risk"].includes(tab)
-                ? "Upstox market data · Native PostgreSQL · Live quotes require a connected account"
+              {[
+                "Today",
+                "Global markets",
+                "Real-time market",
+                "News & risk",
+              ].includes(tab)
+                ? "Check each source’s timestamp and coverage. Live Indian quotes require Upstox; global quotes require a separate provider."
                 : "Synthetic replay · Native PostgreSQL · Historical simulation clock · Not live exchange data"}
             </span>
             <span className="right">PAPER ONLY</span>
@@ -279,7 +301,12 @@ export default function Page() {
                   className="stats"
                   hidden={tab === "Real-time market"}
                   style={
-                    ["Real-time market", "News & risk"].includes(tab)
+                    [
+                      "Today",
+                      "Global markets",
+                      "Real-time market",
+                      "News & risk",
+                    ].includes(tab)
                       ? { display: "none" }
                       : undefined
                   }
@@ -302,7 +329,7 @@ export default function Page() {
                     ],
                     [
                       "Risk engine",
-                      data.killSwitch ? "HALTED" : "Protected",
+                      data.killSwitch ? "HALTED" : "Basic checks on",
                       data.killSwitch
                         ? "Kill switch is active"
                         : "Deterministic checks enabled",
@@ -317,7 +344,13 @@ export default function Page() {
                 </div>
                 {tab === "News & risk" && <NewsRiskPanel token={token} />}
                 {tab === "Real-time market" && <RealtimePanel token={token} />}
-                {tab === "Overview" && (
+                {tab === "Today" && (
+                  <GlobalOutlook token={token} compact onNavigate={setTab} />
+                )}
+                {tab === "Global markets" && (
+                  <GlobalOutlook token={token} onNavigate={setTab} />
+                )}
+                {tab === "Paper terminal" && (
                   <div className="grid">
                     <div className="panel chart">
                       <div className="panelTitle">
@@ -603,7 +636,15 @@ export default function Page() {
                           Create a paper order to see risk checks, approvals and
                           fills.
                         </p>
-                        <button onClick={() => setTab("Paper terminal")}>
+                        <button
+                          onClick={() =>
+                            setTab(
+                              tab === "Today"
+                                ? "News & risk"
+                                : "Paper terminal",
+                            )
+                          }
+                        >
                           Open paper terminal →
                         </button>
                       </div>

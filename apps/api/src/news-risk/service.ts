@@ -1,3 +1,4 @@
+import type { GlobalMarkets } from "../global-markets/service";
 import { randomUUID } from "node:crypto";
 import { BadRequestException } from "@nestjs/common";
 import { z } from "zod";
@@ -28,6 +29,7 @@ export class NewsRiskService {
   constructor(
     private store: LocalStore,
     private feed: (tenant: string) => UpstoxFeed,
+    private globalMarkets?: GlobalMarkets,
   ) {}
   async settings(t: string): Promise<SettingsValue> {
     const defaults = Settings.parse({});
@@ -355,6 +357,24 @@ export class NewsRiskService {
         "unavailable",
         "Upstox positions, holdings, margin and order reconciliation are not connected; account checks below cover local paper records only.",
       );
+      const global = this.globalMarkets
+        ? await this.globalMarkets.state()
+        : undefined;
+      if (global) {
+        record(
+          "Global markets",
+          global.quotes.every((q) => q.state === "available")
+            ? "checked"
+            : "partial",
+          `${global.quotes.filter((q) => q.state === "available").length}/${global.quotes.length} quotes available. Snapshot ${global.checkedAt}; regional breadth is not an India forecast.`,
+        );
+        record(
+          "International headlines",
+          global.news.length ? "partial" : "unavailable",
+          global.newsStatus,
+        );
+        articles.push(...global.news);
+      }
       const merged = new Map<string, Article>();
       for (const article of articles) {
         const old = merged.get(article.id);
@@ -369,7 +389,13 @@ export class NewsRiskService {
         (b.publishedAt ?? "").localeCompare(a.publishedAt ?? ""),
       );
       const relevant = unique.filter((a) => a.instruments.length);
-      const ai = await analyze(relevant);
+      const evidence = [
+        ...relevant.slice(0, 10),
+        ...(global?.news ?? [])
+          .filter((a) => !relevant.slice(0, 10).some((r) => r.id === a.id))
+          .slice(0, 5),
+      ];
+      const ai = await analyze(evidence);
       record(
         "AI research",
         ai.state === "generated" ? "checked" : "unavailable",
@@ -381,8 +407,9 @@ export class NewsRiskService {
         createdAt: checkedAt,
         coverage,
         fundamentals,
+        global,
         ai,
-        evidence: relevant.slice(0, 15),
+        evidence,
         articleCount: unique.length,
         relevantCount: relevant.length,
         summary: `${relevant.length} matched articles; ${coverage.filter((c) => c.state === "unavailable").length} unavailable research sources/checks. Review the coverage table before relying on this briefing.`,

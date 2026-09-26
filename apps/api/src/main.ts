@@ -508,7 +508,18 @@ async function main() {
   process.once("SIGTERM", () => void shutdown());
   process.once("SIGINT", () => void shutdown());
 }
-main().catch(() => {
-  console.error("API startup failed. Verify .env and run pnpm db:migrate.");
+main().catch((error: unknown) => {
+  const message = error instanceof Error ? error.message : "";
+  const known = [
+    "API database role must not bypass tenant isolation",
+    "Database migrations missing; run pnpm db:migrate",
+    "DATABASE_URL missing; run pnpm setup:local",
+  ];
+  console.error(
+    "API startup failed:",
+    known.includes(message)
+      ? message
+      : "Check PostgreSQL connectivity, credentials and migrations.",
+  );
   process.exitCode = 1;
 });

@@ -58,3 +58,16 @@ Database tests use isolated labeled test tenants in the project database. Backup
 `pnpm test:e2e` defines automated Playwright checks on isolated ports; install Chromium first. Local sandbox restrictions can prevent Chromium launch; in-app browser walkthroughs do not count as a passing Playwright suite.
 
 Redis, MinIO, Mailpit, MLflow, Prometheus, Grafana and Ollama remain optional scaffolding until their application integrations are implemented. See FEATURE_AUDIT.md for the precise missing scope.
+
+### Existing .env and custom database names
+
+Create and maintain `.env` yourself using `.env.example`. `pnpm db:migrate`
+reads `DATABASE_URL` and migrates exactly that database (for example
+`mktechmonkai_local`). Supply a dedicated application username and password;
+never use a PostgreSQL superuser as the application connection.
+Set `PG_ADMIN_URL` in `.env` or your shell for an administrator on the same
+host and port. If omitted, setup uses your OS username on that host and port.
+Setup creates a missing application role using the supplied password, but never
+resets an existing role password or changes `.env`. It verifies the application
+connection after migration before reporting success. `pnpm dev` and `pnpm start`
+check database readiness before launching services.

@@ -13,6 +13,11 @@ if(mode==='build'){const child=spawn('pnpm',['exec','turbo','build'],{env,stdio:
 else {
  if(!existsSync('.env'))throw new Error('Run pnpm setup:local to configure PostgreSQL');
  const python=resolve(root,'apps/analytics/.venv/bin/python');if(!existsSync(python))throw new Error('Run pnpm setup:local to install analytics');
+ const ready=await new Promise(resolveCheck=>{
+  const check=spawn('pnpm',['--filter','@mk/api','exec','tsx','src/check-startup.ts'],{cwd:root,env,stdio:'inherit'});
+  check.once('error',()=>resolveCheck(false));check.once('exit',code=>resolveCheck(code===0));
+ });
+ if(!ready)process.exit(1);
  launch(python,['-m','uvicorn','analytics.main:app','--host','127.0.0.1','--port',analytics],resolve(root,'apps/analytics'));
  launch('pnpm',['--filter','@mk/api',mode==='start'?'start':'dev']);
  launch('pnpm',['--filter','@mk/web','exec','next',mode==='start'?'start':'dev','--hostname','127.0.0.1','--port',web]);

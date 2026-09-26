@@ -1,92 +1,126 @@
 import "reflect-metadata";
 import { DataSource } from "typeorm";
-import { randomBytes } from "node:crypto";
-import {
-  readFileSync,
-  writeFileSync,
-  existsSync,
-  chmodSync,
-  readdirSync,
-} from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { userInfo } from "node:os";
-import { repositoryRoot } from "./local-config";
+import { loadLocalEnvironment, repositoryRoot } from "./local-config";
+import { LocalStore } from "./persistence";
+
 async function setup() {
-  const root = repositoryRoot();
-  const envPath = resolve(root, ".env");
+  loadLocalEnvironment();
+  if (!process.env.DATABASE_URL)
+    throw new Error(
+      "Set DATABASE_URL in your local .env using a dedicated non-superuser role before running migrations.",
+    );
+  const application = new URL(process.env.DATABASE_URL);
+  const database = decodeURIComponent(application.pathname.slice(1));
+  const role = decodeURIComponent(application.username);
+  if (!database || !role)
+    throw new Error(
+      "DATABASE_URL must specify a database and application role.",
+    );
   const adminUrl =
     process.env.PG_ADMIN_URL ??
-    `postgresql://${encodeURIComponent(userInfo().username)}@127.0.0.1:5432/postgres`;
+    `postgresql://${encodeURIComponent(userInfo().username)}@${application.host}/postgres`;
+  const adminTarget = new URL(adminUrl);
+  if (
+    adminTarget.hostname !== application.hostname ||
+    adminTarget.port !== application.port
+  )
+    throw new Error(
+      "PG_ADMIN_URL and DATABASE_URL must use the same PostgreSQL host and port.",
+    );
+  const identifier = (value: string) => '"' + value.replaceAll('"', '""') + '"';
   const admin = new DataSource({ type: "postgres", url: adminUrl });
   await admin.initialize();
   try {
-    const databases = await admin.query(
-      "SELECT 1 FROM pg_database WHERE datname=$1",
-      ["mktechmonk_local"],
+    const [existing] = await admin.query(
+      "SELECT rolsuper,rolbypassrls FROM pg_roles WHERE rolname=$1",
+      [role],
     );
-    if (!databases.length)
-      await admin.query("CREATE DATABASE mktechmonk_local");
-    const role = await admin.query("SELECT 1 FROM pg_roles WHERE rolname=$1", [
-      "mktechmonk_app",
-    ]);
-    if (!role.length) {
-      const password = randomBytes(32).toString("hex");
-      await admin.query(
-        `CREATE ROLE mktechmonk_app LOGIN PASSWORD '${password}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOINHERIT`,
-      );
-      if (!existsSync(envPath)) {
-        writeFileSync(
-          envPath,
-          `DATABASE_URL=postgresql://mktechmonk_app:${password}@127.0.0.1:5432/mktechmonk_local\nEXECUTION_MODE=paper\nLIVE_TRADING_ENABLED=false\nAI_PROVIDER=disabled\nWEB_PORT=3200\nAPI_PORT=4200\nANALYTICS_PORT=8200\n`,
-          { mode: 0o600 },
-        );
-      }
-    }
-    if (!existsSync(envPath))
+    if (existing?.rolsuper || existing?.rolbypassrls)
       throw new Error(
-        "Existing application role found; create .env with DATABASE_URL for that role. No role password was changed.",
+        "DATABASE_URL uses a superuser or BYPASSRLS role. Use a dedicated application role (for example mktechmonk_app); put administrator credentials in PG_ADMIN_URL.",
       );
-    chmodSync(envPath, 0o600);
+    if (!existing) {
+      const password = decodeURIComponent(application.password);
+      if (!password)
+        throw new Error(
+          "Set an application password in DATABASE_URL before creating its role.",
+        );
+      const [quoted] = await admin.query(
+        "SELECT quote_literal($1) AS password",
+        [password],
+      );
+      await admin.query(
+        `CREATE ROLE ${identifier(role)} LOGIN PASSWORD ${quoted.password} NOSUPERUSER NOBYPASSRLS NOCREATEDB NOCREATEROLE NOINHERIT`,
+      );
+    }
+    if (
+      !(
+        await admin.query("SELECT 1 FROM pg_database WHERE datname=$1", [
+          database,
+        ])
+      ).length
+    )
+      await admin.query(`CREATE DATABASE ${identifier(database)}`);
   } finally {
     await admin.destroy();
   }
-  const dbUrl = new URL(adminUrl);
-  dbUrl.pathname = "/mktechmonk_local";
-  const migration = new DataSource({ type: "postgres", url: dbUrl.toString() });
+  adminTarget.pathname = application.pathname;
+  const migration = new DataSource({
+    type: "postgres",
+    url: adminTarget.toString(),
+  });
   await migration.initialize();
   try {
     await migration.transaction(async (manager) => {
-      const directory = resolve(root, "infra/local/migrations");
+      const directory = resolve(repositoryRoot(), "infra/local/migrations");
       for (const filename of readdirSync(directory)
         .filter((name) => /^\d+.*\.sql$/.test(name))
-        .sort()) {
+        .sort())
         await manager.query(readFileSync(resolve(directory, filename), "utf8"));
-      }
       await manager.query(
-        "GRANT CONNECT ON DATABASE mktechmonk_local TO mktechmonk_app",
-      );
-      await manager.query("GRANT USAGE ON SCHEMA public TO mktechmonk_app");
-      await manager.query(
-        "GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA public TO mktechmonk_app",
+        `GRANT CONNECT ON DATABASE ${identifier(database)} TO ${identifier(role)}`,
       );
       await manager.query(
-        "GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO mktechmonk_app",
+        `GRANT USAGE ON SCHEMA public TO ${identifier(role)}`,
+      );
+      await manager.query(
+        `GRANT SELECT, INSERT, UPDATE ON ALL TABLES IN SCHEMA public TO ${identifier(role)}`,
+      );
+      await manager.query(
+        `GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO ${identifier(role)}`,
       );
       await manager.query(
         "INSERT INTO local_tenants(id,name) VALUES('mk-demo','MKTechMonk Local') ON CONFLICT DO NOTHING",
       );
     });
-    console.log(
-      "Local database migrated. Application uses a non-superuser role. Credentials stored only in ignored .env.",
-    );
   } finally {
     await migration.destroy();
   }
+  const store = new LocalStore();
+  try {
+    await store.init();
+  } finally {
+    await store.close();
+  }
+  console.log(
+    `Database ${database} migrated; application connection and restricted role verified. Your .env was not modified.`,
+  );
 }
-setup().catch((e) => {
+setup().catch((error) => {
+  // Never print raw driver errors: they can contain SQL or credentials.
+  const message = error instanceof Error ? error.message : "Unknown error";
+  const safe =
+    /^(Set |DATABASE_URL |PG_ADMIN_URL |Database migrations missing|API database role)/.test(
+      message,
+    );
   console.error(
     "Local setup failed:",
-    e instanceof Error ? e.message : "database error",
+    safe
+      ? message
+      : "Check PostgreSQL connectivity, administrator privileges and application credentials. No credentials were printed.",
   );
   process.exitCode = 1;
 });

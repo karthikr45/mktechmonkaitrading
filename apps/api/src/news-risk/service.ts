@@ -20,6 +20,7 @@ import {
   rssSources,
   rssFreshness,
 } from "./providers";
+import { marketEvidence } from "./evidence";
 import { analyze } from "./ai";
 export class NewsRiskService {
   private timer?: ReturnType<typeof setInterval>;
@@ -395,7 +396,11 @@ export class NewsRiskService {
           .filter((a) => !relevant.slice(0, 10).some((r) => r.id === a.id))
           .slice(0, 5),
       ];
-      const ai = await analyze(evidence);
+      evidence.push(...marketEvidence(global?.quotes ?? []));
+      const ai = await analyze(
+        evidence,
+        coverage.map((c) => `${c.name}: ${c.state}. ${c.detail}`),
+      );
       record(
         "AI research",
         ai.state === "generated" ? "checked" : "unavailable",

@@ -57,7 +57,7 @@ actual subscribed account and acceptance testing. No economic-event calendar, FI
 advance/decline feed, after-hours prices, earnings dates or cross-market forecasting is
 implemented here. Global snapshots are cached in memory and retained with saved News & risk briefings.
 Up to five international headlines join up to ten watchlist articles as evidence for the
-existing local AI summarizer when configured. Quotes themselves do not generate AI forecasts.
+existing local AI summarizer when configured. Up to 40 eligible timestamped quotes also enter AI evidence; stale or invalid observations are excluded. AI explains the supplied observations and missing coverage, without inventing forecasts or assuming US technology determines India.
 Coverage gaps use the existing persistent alert inbox; external notifications are not implemented.
 
 Sources: https://twelvedata.com/docs ; https://support.twelvedata.com/en/articles/5620513-how-to-find-all-available-symbols-at-twelve-data

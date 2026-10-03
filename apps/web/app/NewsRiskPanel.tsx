@@ -445,9 +445,19 @@ export default function NewsRiskPanel({ token }: { token: string }) {
                     data.articles.find((a) => a.article.id === id)?.article;
                   return a ? (
                     <p key={id}>
-                      <a href={a.url} target="_blank" rel="noreferrer">
-                        {a.title}
-                      </a>
+                      {a.id.startsWith("market:") ? (
+                        <>
+                          <strong>{a.title}</strong>
+                          <br />
+                          {a.summary}
+                          <br />
+                          <small>{a.source} · saved observation</small>
+                        </>
+                      ) : (
+                        <a href={a.url} target="_blank" rel="noreferrer">
+                          {a.title}
+                        </a>
+                      )}
                     </p>
                   ) : (
                     <p key={id}>

@@ -25,7 +25,7 @@ RSS defaults can be overridden with `NEWS_RSS_URLS` (maximum five comma-separate
 
 The gateway supports an already-running local Ollama model. In your locally maintained `.env`, set `AI_PROVIDER=ollama`, `OLLAMA_URL=http://127.0.0.1:11434`, and `OLLAMA_MODEL` to an installed model name. No model is installed/downloaded automatically. With `AI_PROVIDER=disabled`, deterministic alerts continue and AI coverage is explicitly unavailable.
 
-The model receives up to 15 matched source headlines/summaries, no broker credentials, and no execution tools. It returns a schema-validated summary with evidence references, implications, review points and uncertainty. Unknown citation IDs fail validation. Evidence snapshots are stored with each report. Validation does not establish factual accuracy; generated prose remains labeled AI interpretation. Timeout/invalid output never suppresses deterministic risk alerts. Configured AI execution has not been verified against an actual installed model on this machine.
+The model receives up to 15 source headlines/summaries (watchlist and international) and up to 40 eligible timestamped global quote observations, no broker credentials, and no execution tools. It returns a schema-validated summary with evidence references, implications, review points and uncertainty. Unknown citation IDs fail validation. Evidence snapshots are stored with each report. Validation does not establish factual accuracy; generated prose remains labeled AI interpretation. Timeout/invalid output never suppresses deterministic risk alerts. Use `pnpm --filter @mk/api exec tsx src/check-ai-local.ts` to verify local model generation against current source evidence.
 
 ## Alerts and daily checklist
 

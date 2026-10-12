@@ -39,3 +39,9 @@ Run `pnpm --filter @mk/api exec tsx src/check-ai-local.ts` from the repository r
 This uses actual retrieved news and configured provider observations, not fixture market
 values. Success validates local model generation and citation IDs, not the truth of each
 inference. Allow up to 180 seconds per generation on local hardware.
+
+## Indian F&O scanner extension
+
+The detailed daily/opening/intraday scanner requirements, DOCX stock-analysis requirements,
+calculation conventions and acceptance gates are captured in [FNO_RESEARCH_DESIGN.md](FNO_RESEARCH_DESIGN.md).
+This remains implementation scope, not a completed scanner or authorization for live orders.

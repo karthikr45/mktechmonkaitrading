@@ -23,6 +23,7 @@ import {
 import type { Request, Response } from "express";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
+import { FnoService } from "./fno/service";
 import { GlobalMarkets } from "./global-markets/service";
 import { NewsRiskService } from "./news-risk/service";
 import { projectRisk } from "./news-risk/contracts";
@@ -43,6 +44,12 @@ function upstox(tenantId: string) {
   }
   return feed;
 }
+const fno = new FnoService(store, (t, path) =>
+  upstox(t).researchRequest(
+    path,
+    t === "mk-demo" ? process.env.UPSTOX_ACCESS_TOKEN : undefined,
+  ),
+);
 const globalMarkets = new GlobalMarkets();
 const newsRisk = new NewsRiskService(store, upstox, globalMarkets);
 function token(req: Request) {
@@ -77,6 +84,51 @@ async function validated<T>(fn: () => Promise<T>) {
 @ApiBearerAuth()
 @Controller("v1")
 class Api {
+  @Get("fno") async fnoState(@Req() req: Request) {
+    return fno.state(await tenant(req));
+  }
+  @Post("fno/settings") async fnoSettings(
+    @Req() req: Request,
+    @Body() body: unknown,
+  ) {
+    return validated(async () => fno.save(await tenant(req), body));
+  }
+  @Post("fno/scan") async fnoStart(@Req() req: Request) {
+    return validated(async () => fno.start(await tenant(req)));
+  }
+  @Get("fno/runs/:id") async fnoReport(
+    @Req() req: Request,
+    @Param("id") id: string,
+  ) {
+    return validated(async () =>
+      fno.report(await tenant(req), z.string().uuid().parse(id)),
+    );
+  }
+  @Post("fno/runs/:id/cancel") async fnoCancel(
+    @Req() req: Request,
+    @Param("id") id: string,
+  ) {
+    return validated(async () =>
+      fno.cancel(await tenant(req), z.string().uuid().parse(id)),
+    );
+  }
+  @Post("fno/runs/:id/explain") async fnoExplain(
+    @Req() req: Request,
+    @Param("id") id: string,
+    @Body() body: unknown,
+  ) {
+    return validated(async () =>
+      fno.explain(
+        await tenant(req),
+        z.string().uuid().parse(id),
+        z
+          .object({ key: z.string().max(100) })
+          .strict()
+          .parse(body).key,
+      ),
+    );
+  }
+
   @Get("global-markets") async global(@Req() req: Request) {
     await tenant(req);
     return globalMarkets.state();

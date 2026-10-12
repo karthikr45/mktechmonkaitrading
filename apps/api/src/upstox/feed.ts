@@ -101,7 +101,11 @@ export class UpstoxFeed {
     path: string,
     fallbackToken?: string,
   ): Promise<unknown> {
-    if (!/^\/v2\/(news\?|fundamentals\/[A-Z0-9]{12}\/key-ratios$)/.test(path))
+    if (
+      !/^\/v2\/(news\?|market-quote\/quotes\?|option\/chain\?|historical-candle\/NSE_(?:EQ|FO)%7C[A-Za-z0-9]+\/day\/\d{4}-\d{2}-\d{2}\/\d{4}-\d{2}-\d{2}$|fundamentals\/[A-Z0-9]{12}\/key-ratios$)/.test(
+        path,
+      )
+    )
       throw new Error("Unsupported research path");
     const credential = this.accessToken || fallbackToken;
     if (!credential) throw new Error("Upstox token is not configured");

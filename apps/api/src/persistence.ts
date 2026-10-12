@@ -29,9 +29,9 @@ export class LocalStore {
       throw new Error("API database role must not bypass tenant isolation");
     }
     const migrations = await this.db.query(
-      "SELECT version FROM schema_migrations WHERE version IN (1,2)",
+      "SELECT version FROM schema_migrations WHERE version IN (1,2,3)",
     );
-    if (migrations.length !== 2) {
+    if (migrations.length !== 3) {
       await this.db.destroy();
       throw new Error("Database migrations missing; run pnpm db:migrate");
     }

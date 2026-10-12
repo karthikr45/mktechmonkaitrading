@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import FnoPanel from "./FnoPanel";
 import GlobalOutlook from "./GlobalOutlook";
 import NewsRiskPanel from "./NewsRiskPanel";
 import RealtimePanel from "./RealtimePanel";
@@ -37,6 +38,7 @@ type Snapshot = {
 const tabs = [
   "Today",
   "Global markets",
+  "F&O scanner",
   "Real-time market",
   "News & risk",
   "Paper terminal",
@@ -182,6 +184,7 @@ export default function Page() {
                 [
                   "Today",
                   "Global markets",
+                  "F&O scanner",
                   "Real-time market",
                   "News & risk",
                   "Trade journal",
@@ -229,6 +232,7 @@ export default function Page() {
               {[
                 "Today",
                 "Global markets",
+                "F&O scanner",
                 "Real-time market",
                 "News & risk",
               ].includes(tab)
@@ -266,6 +270,7 @@ export default function Page() {
               {[
                 "Today",
                 "Global markets",
+                "F&O scanner",
                 "Real-time market",
                 "News & risk",
               ].includes(tab)
@@ -304,6 +309,7 @@ export default function Page() {
                     [
                       "Today",
                       "Global markets",
+                      "F&O scanner",
                       "Real-time market",
                       "News & risk",
                     ].includes(tab)
@@ -342,6 +348,7 @@ export default function Page() {
                     </div>
                   ))}
                 </div>
+                {tab === "F&O scanner" && <FnoPanel token={token} />}
                 {tab === "News & risk" && <NewsRiskPanel token={token} />}
                 {tab === "Real-time market" && <RealtimePanel token={token} />}
                 {tab === "Today" && (

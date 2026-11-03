@@ -84,6 +84,27 @@ async function validated<T>(fn: () => Promise<T>) {
 @ApiBearerAuth()
 @Controller("v1")
 class Api {
+  @Post("fno/technicals") async fnoTechnicals(
+    @Req() req: Request,
+    @Body() body: unknown,
+  ) {
+    return validated(async () => {
+      const input = z
+        .object({ symbol: z.string().trim().min(1).max(40) })
+        .strict()
+        .parse(body);
+      return fno.technicals(await tenant(req), input.symbol);
+    });
+  }
+  @Get("fno/backtests") async fnoBacktests(@Req() req: Request) {
+    return validated(async () => fno.backtestHistory(await tenant(req)));
+  }
+  @Post("fno/backtests") async fnoBacktest(
+    @Req() req: Request,
+    @Body() body: unknown,
+  ) {
+    return validated(async () => fno.backtest(await tenant(req), body));
+  }
   @Get("fno") async fnoState(@Req() req: Request) {
     return fno.state(await tenant(req));
   }

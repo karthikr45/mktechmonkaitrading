@@ -77,8 +77,40 @@ async function main() {
       master,
     );
     assert.equal((await restarted.report(t, id)).result.rows.length, 1);
+    const historical = new FnoService(
+      store,
+      async () => ({
+        status: "success",
+        data: {
+          candles: Array.from({ length: 60 }, (_, i) => [
+            new Date(Date.now() - (61 - i) * 86400000).toISOString(),
+            100 + i * 3,
+            105 + i * 3,
+            99 + i * 3,
+            103 + i * 3,
+            1000,
+            1000 * 1.2 ** i,
+          ]),
+        },
+      }),
+      master,
+    );
+    const study = await historical.backtest(t, { symbol: "Fixture" });
+    assert.equal(study.result.bars, 60);
+    assert.equal(study.result.inputCandles.length, 60);
+    assert.ok(
+      (await historical.backtestHistory(t)).some(
+        (r: { id: string }) => r.id === study.id,
+      ),
+    );
+    assert.equal((await historical.backtestHistory(other)).length, 0);
+    assert.ok(
+      (await restarted.backtestHistory(t)).some(
+        (r: { id: string }) => r.id === study.id,
+      ),
+    );
     console.log(
-      "PASS: filters, duplicate scan lock, background completion, persisted observations, missing-evidence gating, restart reads and tenant isolation.",
+      "PASS: filters, duplicate scan lock, completion, observations, historical studies with retained inputs, missing-evidence gating, restart reads and tenant isolation.",
     );
   } finally {
     await store.close();

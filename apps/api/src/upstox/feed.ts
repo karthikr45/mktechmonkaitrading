@@ -102,6 +102,9 @@ export class UpstoxFeed {
     fallbackToken?: string,
   ): Promise<unknown> {
     if (
+      !/^\/v3\/historical-candle\/(?:intraday\/)?NSE_EQ%7C[A-Za-z0-9]+\/(?:minutes\/(?:5|15)|hours\/1|days\/1|weeks\/1|months\/1)(?:\/\d{4}-\d{2}-\d{2}\/\d{4}-\d{2}-\d{2})?$/.test(
+        path,
+      ) &&
       !/^\/v2\/(news\?|market-quote\/quotes\?|option\/chain\?|historical-candle\/NSE_(?:EQ|FO)%7C[A-Za-z0-9]+\/day\/\d{4}-\d{2}-\d{2}\/\d{4}-\d{2}-\d{2}$|fundamentals\/[A-Z0-9]{12}\/key-ratios$)/.test(
         path,
       )

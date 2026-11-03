@@ -1,5 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
+import FnoBacktest from "./FnoBacktest";
+import FnoTechnicals from "./FnoTechnicals";
 type Filters = {
   priceMove: number;
   oiChange: number;
@@ -129,6 +131,8 @@ export default function FnoPanel({ token }: { token: string }) {
   const active = runs.find((r) => r.state === "running");
   return (
     <div className="outlook">
+      <FnoTechnicals token={token} />
+      <FnoBacktest token={token} />
       <section className="panel">
         <h2>F&O research scanner</h2>
         <p>

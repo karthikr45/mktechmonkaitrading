@@ -12,13 +12,170 @@ import {
 } from "./analytics";
 import { loadUniverse, Quotes } from "./provider";
 import { analyze } from "../news-risk/ai";
+import { BacktestInput, backtest } from "./backtest";
+import { completed, indicators } from "./technicals";
 export class FnoService {
   private cancelling = new Set<string>();
+  private backtesting = new Set<string>();
+  private analysing = new Set<string>();
   constructor(
     private store: LocalStore,
     private request: (tenant: string, path: string) => Promise<unknown>,
     private master = loadUniverse,
   ) {}
+  async technicals(t: string, symbol: string) {
+    if (this.analysing.has(t))
+      throw new BadRequestException("Technical analysis is already running");
+    this.analysing.add(t);
+    try {
+      const master = await this.master();
+      const stock = master.stocks.find(
+        (s) => s.symbol.toUpperCase() === symbol.trim().toUpperCase(),
+      );
+      if (!stock)
+        throw new BadRequestException(
+          "Stock not found in current F&O universe",
+        );
+      const now = Date.now(),
+        today = new Date(now + 330 * 60000).toISOString().slice(0, 10);
+      const yesterday = new Date(now + 330 * 60000 - 86400000)
+        .toISOString()
+        .slice(0, 10);
+      const frames = [];
+      for (const [frame, path, days] of [
+        ["5m", "minutes/5", 28],
+        ["15m", "minutes/15", 28],
+        ["1h", "hours/1", 85],
+        ["daily", "days/1", 3000],
+        ["weekly", "weeks/1", 7000],
+        ["monthly", "months/1", 9000],
+      ] as const) {
+        try {
+          const from = new Date(now - days * 86400000)
+            .toISOString()
+            .slice(0, 10);
+          const key = encodeURIComponent(stock.key);
+          const history = candles(
+            await this.request(
+              t,
+              `/v3/historical-candle/${key}/${path}/${yesterday}/${from}`,
+            ),
+            today,
+          );
+          let current: ReturnType<typeof candles> = [];
+          let intradayAccess = "Not requested for EOD frame";
+          if (["5m", "15m", "1h"].includes(frame)) {
+            try {
+              current = candles(
+                await this.request(
+                  t,
+                  `/v3/historical-candle/intraday/${key}/${path}`,
+                ),
+                "9999-12-31",
+              ).filter((r) => r[0].slice(0, 10) === today);
+              intradayAccess = current.length
+                ? "Current-session candles returned"
+                : "No current-session candles";
+            } catch {
+              intradayAccess =
+                "Current-session request unavailable; history only";
+            }
+          }
+          const rows = completed([...history, ...current], frame, now);
+          frames.push({
+            frame,
+            status: rows.length ? "available" : "unavailable",
+            intradayAccess,
+            ...indicators(rows),
+          });
+        } catch {
+          frames.push({
+            frame,
+            status: "unavailable",
+            reason: "Provider history unavailable or failed validation",
+          });
+        }
+        await new Promise((r) => setTimeout(r, 400));
+      }
+      const result = {
+        stock,
+        frames,
+        retrievedAt: new Date().toISOString(),
+        source: "Upstox V3 candles",
+        limitation:
+          "On-demand snapshot, not a streaming decision. Only completed candles used; current day/week/month bars excluded for EOD frames. Pivot levels use the last completed bar. No market regime, OI or news confirmation is implied.",
+      };
+      const id = randomUUID();
+      await this.store.scoped(t, (m) =>
+        m.query(
+          "INSERT INTO research_runs(tenant_id,id,kind,request,result) VALUES($1,$2,'fno-technicals',$3,$4)",
+          [t, id, JSON.stringify({ symbol }), JSON.stringify(result)],
+        ),
+      );
+      return { id, result };
+    } finally {
+      this.analysing.delete(t);
+    }
+  }
+  async backtestHistory(t: string) {
+    return this.store.scoped(t, (m) =>
+      m.query(
+        "SELECT id,request,result,created_at FROM research_runs WHERE tenant_id=$1 AND kind='fno-backtest' ORDER BY created_at DESC LIMIT 10",
+        [t],
+      ),
+    );
+  }
+  async backtest(t: string, body: unknown) {
+    const input = BacktestInput.parse(body);
+    if (this.backtesting.has(t))
+      throw new BadRequestException("A historical study is already running");
+    this.backtesting.add(t);
+    try {
+      const universe = await this.master();
+      const stock = universe.stocks.find(
+        (s) => s.symbol.toUpperCase() === input.symbol.toUpperCase(),
+      );
+      if (!stock)
+        throw new BadRequestException(
+          "Symbol not found in the current stock F&O universe",
+        );
+      const today = new Date(Date.now() + 330 * 60000)
+        .toISOString()
+        .slice(0, 10);
+      const from = new Date(Date.now() - 365 * 86400000)
+        .toISOString()
+        .slice(0, 10);
+      const rows = candles(
+        await this.request(
+          t,
+          `/v2/historical-candle/${encodeURIComponent(stock.future)}/day/${today}/${from}`,
+        ),
+        today,
+      );
+      if (rows.length < 30)
+        throw new BadRequestException(
+          "Provider returned fewer than 30 completed daily bars for this active futures contract. No statistics generated.",
+        );
+      const result = {
+        ...backtest(rows, input),
+        inputCandles: rows,
+        stock,
+        source: "Upstox historical daily futures candles",
+        retrievedAt: new Date().toISOString(),
+        universePublishedAt: universe.publishedAt,
+      };
+      const id = randomUUID();
+      await this.store.scoped(t, (m) =>
+        m.query(
+          "INSERT INTO research_runs(tenant_id,id,kind,request,result) VALUES($1,$2,'fno-backtest',$3,$4)",
+          [t, id, JSON.stringify(input), JSON.stringify(result)],
+        ),
+      );
+      return { id, result };
+    } finally {
+      this.backtesting.delete(t);
+    }
+  }
   async settings(t: string) {
     const [row] = await this.store.scoped(t, (m) =>
       m.query("SELECT filters,revision FROM fno_settings WHERE tenant_id=$1", [

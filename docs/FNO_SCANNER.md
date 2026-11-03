@@ -1,5 +1,10 @@
 # F&O scanner implementation status
 
+Update 2026-11-03: on-demand six-timeframe technical analysis and persisted real
+active-futures daily outcome studies are now available in this panel. See
+CLIENT_ACCEPTANCE.md for the current requirement-by-requirement status. Scanner
+trade qualification remains incomplete; these new analyses do not silently enable it.
+
 The F&O scanner is accessible from the main navigation. This release provides an
 end-to-end *observation* workflow, not the complete trade-qualification design.
 

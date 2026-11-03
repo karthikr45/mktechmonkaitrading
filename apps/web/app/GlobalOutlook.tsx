@@ -157,8 +157,8 @@ export default function GlobalOutlook({
         <section className="panel">
           <h2>Before your next trade</h2>
           <p>
-            Review your alerts, prepare your plan, then use the paper workspace
-            to practise.
+            Review your alerts, examine a stock’s chart and F&O evidence, then
+            record your plan in the journal.
           </p>
           {tasks.map((t) => (
             <p key={t.title}>
@@ -279,46 +279,20 @@ export default function GlobalOutlook({
         ))}
       </section>
       {!compact && (
-        <details className="panel">
-          <summary>Data setup & coverage limits</summary>
+        <section className="panel">
+          <h2>Coverage & freshness</h2>
           <p>
-            Add TWELVE_DATA_API_KEY and GLOBAL_MARKET_SYMBOLS to your local
-            .env, then restart. Select symbols only after verifying their
-            exchange, instrument identity and entitlement with the provider. The
-            subscription may not cover indices or GIFT Nifty.
+            Quotes are cached for 15 minutes. Unavailable instruments have no
+            substitute prices. A partial region cannot establish the direction
+            of the whole market.
           </p>
-          <p>
-            Example mapping for the seven US stocks:{" "}
-            <code>
-              {JSON.stringify(
-                Object.fromEntries(
-                  ["NVDA", "MSFT", "GOOGL", "AAPL", "AMZN", "META", "TSLA"].map(
-                    (s) => [s, s],
-                  ),
-                ),
-              )}
-            </code>
-          </p>
-          <p>
-            Requests are cached for 15 minutes. Each mapped symbol can consume a
-            provider credit; confirm your quota. Never put credentials in the
-            browser.
-          </p>
-          <a
-            href="https://twelvedata.com/docs"
-            target="_blank"
-            rel="noreferrer"
-          >
-            Provider documentation
-          </a>
           {data.limitations.map((l) => (
             <p key={l}>{l}</p>
           ))}
-          <p>
-            Configure keys listed below using the verified provider symbols:
-          </p>
-          <code>{data.quotes.map((q) => q.id).join(", ")}</code>
-        </details>
+          <button onClick={() => onNavigate("Data status")}>
+            Check data connections
+          </button>
+        </section>
       )}
     </div>
   );

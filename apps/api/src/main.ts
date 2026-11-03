@@ -519,7 +519,7 @@ class Api {
     );
   }
   @Get("operations") async operations(@Req() req: Request) {
-    await tenant(req);
+    const t = await tenant(req);
     let analytics = "unavailable";
     try {
       const r = await fetch(
@@ -528,12 +528,39 @@ class Api {
       );
       if (r.ok) analytics = "configured";
     } catch {}
+    let ai = "Not configured";
+    if (process.env.AI_PROVIDER === "ollama" && process.env.OLLAMA_MODEL) {
+      ai = "Ollama unavailable";
+      try {
+        const base = new URL(
+          process.env.OLLAMA_URL ?? "http://127.0.0.1:11434",
+        );
+        if (
+          base.protocol !== "http:" ||
+          !["localhost", "127.0.0.1", "[::1]"].includes(base.hostname) ||
+          base.username ||
+          base.password
+        )
+          throw Error();
+        const r = await fetch(new URL("/api/tags", base), {
+          signal: AbortSignal.timeout(2000),
+        });
+        const body = await r.json();
+        if (r.ok && Array.isArray(body.models))
+          ai = body.models.some(
+            (m: { name?: string }) => m.name === process.env.OLLAMA_MODEL,
+          )
+            ? `Ollama reachable · ${process.env.OLLAMA_MODEL} installed`
+            : "Ollama reachable · configured model missing";
+      } catch {}
+    }
     return {
+      checkedAt: new Date().toISOString(),
       database: await store.health(),
       analytics,
-      ai: "unavailable",
-      brokers: "paper only",
-      extensions: "pgvector and TimescaleDB unavailable on this local server",
+      ai,
+      marketFeed: upstox(t).status(),
+      globalMarkets: await globalMarkets.state(),
     };
   }
   @Header("Content-Type", "text/plain; version=0.0.4")

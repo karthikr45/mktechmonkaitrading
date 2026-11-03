@@ -56,3 +56,27 @@ not an options strategy or margined portfolio simulation. No trade is placed.
 CLI provider acceptance: `pnpm --filter @mk/api exec tsx src/check-fno-live.ts SYMBOL`.
 This makes real provider requests and saves real reports in the local demo tenant.
 Database fixture acceptance: `pnpm --filter @mk/api exec tsx src/check-fno.ts`.
+
+
+## Client interface verification — 3 November 2026
+
+The primary interface now exposes Today, Charts & indicators, Live prices,
+F&O research & backtests, News & AI research, Global markets, Trade journal,
+and Data & AI status. It no longer requests the synthetic `/dashboard` endpoint
+or displays paper balances, synthetic charts, sample orders or demo strategy tools.
+Legacy paper APIs remain for isolated development tests; they are not client menus.
+
+Actual Upstox WebSocket acceptance returned NIFTY 50 and BANK NIFTY provider
+quotes, with exchange status CLOSING_END and inactive last-trade timestamps.
+This verifies authorization, subscription, decoding and delivery into the UI,
+not continuous open-session tick performance. Tick graphs retain at most 200
+received observations per instrument and wait for at least two ticks; no missing
+ticks or synthetic history are inserted. Candlestick charts remain completed-bar
+snapshots with optional 60-second polling.
+
+Twelve Data returned the configured US-stock snapshots. Global coverage remains
+partial; unavailable exchanges are visible. The service status screen checks
+PostgreSQL, analytics, Ollama reachability and installed model, plus actual feed
+state and global quote coverage. Ollama reachability is not a claim that the latest
+briefing succeeded. Full production readiness and complete client coverage remain
+subject to the gaps documented above.

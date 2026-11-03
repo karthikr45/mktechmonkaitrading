@@ -18,6 +18,7 @@ type Status = {
   quotes: Quote[];
 };
 export default function RealtimePanel({ token }: { token: string }) {
+  const [history, setHistory] = useState<Record<string, Quote[]>>({});
   const [status, setStatus] = useState<Status>();
   const [quotes, setQuotes] = useState<Record<string, Quote>>({});
   const [transport, setTransport] = useState("Connecting to local API…");
@@ -30,6 +31,7 @@ export default function RealtimePanel({ token }: { token: string }) {
     const controller = new AbortController();
     let retry: ReturnType<typeof setTimeout>;
     let failures = 0;
+    let epoch = "";
     let lastReceived = Date.now();
     const timer = setInterval(() => {
       setNow(Date.now());
@@ -75,12 +77,24 @@ export default function RealtimePanel({ token }: { token: string }) {
             if (frame.event === "status") {
               const next = frame.data as Status;
               setStatus(next);
+              if (epoch !== next.epoch) {
+                epoch = next.epoch;
+                setHistory({});
+              }
               setQuotes(
                 Object.fromEntries(next.quotes.map((q) => [q.instrument, q])),
               );
             }
             if (frame.event === "tick") {
               const quote = frame.data as Quote;
+              setHistory((old) => {
+                const series = old[quote.instrument] ?? [];
+                if (series.at(-1)?.sequence === quote.sequence) return old;
+                return {
+                  ...old,
+                  [quote.instrument]: [...series, quote].slice(-200),
+                };
+              });
               setQuotes((old) =>
                 old[quote.instrument]?.sequence >= quote.sequence
                   ? old
@@ -157,45 +171,108 @@ export default function RealtimePanel({ token }: { token: string }) {
         <span className="tag">{status?.state ?? "Loading"}</span>
       </div>
       <p role="status">{status?.message ?? "Checking connection…"}</p>
-      <small>{transport} · Market data only · Execution remains paper</small>
+      <small>{transport} · Market data only · No orders placed</small>
       <p>
-        Enter your Upstox access token, or leave it blank to use the local
-        server configuration. Tokens entered here stay in server memory until
-        disconnect or restart.
+        Connect using the credentials already configured on your local server.
+        Prices update when Upstox sends a new quote; a connected socket alone
+        does not mean the market is open.
       </p>
-      <div
-        style={{ display: "grid", gap: 12, maxWidth: 620, margin: "20px 0" }}
-      >
-        <label>
-          Upstox access token
-          <input
-            aria-label="Upstox access token"
-            type="password"
-            autoComplete="off"
-            value={accessToken}
-            onChange={(e) => setAccessToken(e.target.value)}
-          />
-        </label>
-        <label>
-          Instrument keys (one per line, up to 50)
-          <textarea
-            aria-label="Instrument keys"
-            rows={3}
-            value={keys}
-            onChange={(e) => setKeys(e.target.value)}
-            style={{ width: "100%" }}
-          />
-        </label>
-        <div>
-          <button disabled={busy} onClick={() => void action(true)}>
-            Connect Upstox
-          </button>{" "}
-          <button disabled={busy} onClick={() => void action(false)}>
-            Disconnect
-          </button>
-        </div>
+      <div>
+        <button disabled={busy} onClick={() => void action(true)}>
+          Connect live prices
+        </button>{" "}
+        <button disabled={busy} onClick={() => void action(false)}>
+          Disconnect
+        </button>
       </div>
+      <details>
+        <summary>Connection settings & instruments</summary>
+        <div
+          style={{ display: "grid", gap: 12, maxWidth: 620, margin: "20px 0" }}
+        >
+          <label>
+            Upstox access token
+            <input
+              aria-label="Upstox access token"
+              type="password"
+              autoComplete="off"
+              value={accessToken}
+              onChange={(e) => setAccessToken(e.target.value)}
+            />
+          </label>
+          <label>
+            Instrument keys (one per line, up to 50)
+            <textarea
+              aria-label="Instrument keys"
+              rows={3}
+              value={keys}
+              onChange={(e) => setKeys(e.target.value)}
+              style={{ width: "100%" }}
+            />
+          </label>
+          <div>
+            <button disabled={busy} onClick={() => void action(true)}>
+              Connect Upstox
+            </button>{" "}
+            <button disabled={busy} onClick={() => void action(false)}>
+              Disconnect
+            </button>
+          </div>
+        </div>
+      </details>
       {error && <p role="alert">{error}</p>}
+      {Object.entries(history).map(([instrument, series]) => {
+        if (series.length < 2)
+          return (
+            <p key={instrument}>
+              {instrument}: waiting for a second provider tick to draw the price
+              graph.
+            </p>
+          );
+        const prices = series.map((q) => Number(q.price));
+        const lo = Math.min(...prices),
+          hi = Math.max(...prices);
+        const points = prices
+          .map(
+            (v, i) =>
+              `${20 + (i / (prices.length - 1)) * 760},${180 - ((v - lo) / (hi - lo || 1)) * 150}`,
+          )
+          .join(" ");
+        return (
+          <figure key={instrument}>
+            <figcaption>
+              {instrument} · Received tick prices · {series.length} observations
+            </figcaption>
+            <svg
+              viewBox="0 0 800 210"
+              role="img"
+              aria-label={`${instrument} received tick price chart`}
+              style={{ width: "100%", maxWidth: 900 }}
+            >
+              <polyline
+                points={points}
+                fill="none"
+                stroke="#45d8b3"
+                strokeWidth="2"
+              />
+              <text x="20" y="205" fill="currentColor">
+                {lo.toFixed(2)} – {hi.toFixed(2)}
+              </text>
+            </svg>
+            <small>
+              {new Date(series[0].timestamp).toLocaleTimeString("en-IN", {
+                timeZone: "Asia/Kolkata",
+              })}{" "}
+              –{" "}
+              {new Date(series.at(-1)!.timestamp).toLocaleTimeString("en-IN", {
+                timeZone: "Asia/Kolkata",
+              })}{" "}
+              IST · Equal spacing per received tick, not time bars. History
+              starts when this view opens.
+            </small>
+          </figure>
+        );
+      })}
       {!Object.keys(quotes).length ? (
         <p>
           No Upstox quotes received. Connect with a valid token to subscribe.

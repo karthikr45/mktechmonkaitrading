@@ -30,7 +30,7 @@ international indices must be individually verified; do not substitute ETFs sile
 ## Repeatable dependency check
 
 Run `pnpm check:live` from the repository. It validates PostgreSQL schema/role,
-Upstox account authentication and NSE/NFO segments, global symbol configuration,
+Upstox market-data authentication using a Nifty quote (supports analytics tokens), global symbol configuration,
 one explicitly configured global quote, and an actual local Ollama JSON inference.
 It does not print secret values, account profile data, raw provider errors or generated text.
 It exits nonzero if any dependency check is blocked. The single global request can

@@ -1,6 +1,35 @@
 import { expect, it, vi } from "vitest";
 import { checkProviders } from "./providers";
 
+it("checks analytics tokens against market data without requiring account-profile access", async () => {
+  const fetcher = vi
+    .fn()
+    .mockResolvedValue(
+      Response.json({
+        status: "success",
+        data: {
+          nifty: { instrument_token: "NSE_INDEX|Nifty 50", last_price: 100 },
+        },
+      }),
+    );
+  const checks = await checkProviders(
+    { UPSTOX_ACCESS_TOKEN: "test-token" },
+    fetcher,
+  );
+  expect(checks.find((c) => c.name === "Upstox authentication")?.status).toBe(
+    "pass",
+  );
+  expect(String(fetcher.mock.calls[0][0])).toContain("/market-quote/quotes?");
+  fetcher.mockResolvedValue(Response.json({ status: "success", data: {} }));
+  const empty = await checkProviders(
+    { UPSTOX_ACCESS_TOKEN: "test-token" },
+    fetcher,
+  );
+  expect(empty.find((c) => c.name === "Upstox authentication")?.status).toBe(
+    "blocked",
+  );
+});
+
 it("does not contact providers without credentials or local AI configuration", async () => {
   const fetcher = vi.fn();
   const checks = await checkProviders({}, fetcher);

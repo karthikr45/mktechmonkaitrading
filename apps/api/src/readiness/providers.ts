@@ -41,25 +41,27 @@ export async function checkProviders(
       const result = z
         .object({
           status: z.literal("success"),
-          data: z.object({
-            is_active: z.literal(true),
-            exchanges: z.array(z.string()),
-          }),
+          data: z.record(
+            z.string(),
+            z.object({
+              instrument_token: z.literal("NSE_INDEX|Nifty 50"),
+              last_price: z.number().positive(),
+            }),
+          ),
         })
         .parse(
-          await json("https://api.upstox.com/v2/user/profile", {
-            headers: {
-              Authorization: `Bearer ${env.UPSTOX_ACCESS_TOKEN}`,
-              Accept: "application/json",
+          await json(
+            "https://api.upstox.com/v2/market-quote/quotes?instrument_key=NSE_INDEX%7CNifty%2050",
+            {
+              headers: {
+                Authorization: `Bearer ${env.UPSTOX_ACCESS_TOKEN}`,
+                Accept: "application/json",
+              },
             },
-          }),
+          ),
         );
-      if (
-        !result.data.exchanges.includes("NSE") ||
-        !result.data.exchanges.includes("NFO")
-      )
-        throw Error();
-      return "Active account with NSE/NFO segments. Live quote, chain freshness and stream acceptance still required.";
+      if (Object.keys(result.data).length !== 1) throw Error();
+      return "Market-data token accepted and Nifty quote returned. Quote freshness, derivatives and stream acceptance still require verification.";
     });
   let mappings: Record<string, string> = {};
   await check("Global symbol configuration", async () => {

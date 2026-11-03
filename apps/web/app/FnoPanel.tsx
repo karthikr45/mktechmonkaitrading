@@ -29,7 +29,7 @@ type Stock = {
   spotChangePct?: number;
   asOf?: string;
   futuresStructure?: string;
-  futuresOiChangePct?: number;
+  futuresOiChangePct?: number | null;
   missing: string[];
   daily?: {
     bars: number;
@@ -63,6 +63,10 @@ type Report = Run & {
   };
 };
 export default function FnoPanel({ token }: { token: string }) {
+  const percent = (value?: number | null) =>
+    value !== undefined && value !== null && Number.isFinite(value)
+      ? `${value.toFixed(2)}%`
+      : "Not verified";
   const [filters, setFilters] = useState<Filters>();
   const [runs, setRuns] = useState<Run[]>([]);
   const [report, setReport] = useState<Report>();
@@ -163,6 +167,10 @@ export default function FnoPanel({ token }: { token: string }) {
               <p>
                 Horizon is saved for the report; horizon-specific qualification
                 is not yet active.
+              </p>
+              <p>
+                These thresholds are user-defined screening rules. Historical
+                success rates and out-of-sample validation are not available.
               </p>
               {(
                 [
@@ -285,7 +293,9 @@ export default function FnoPanel({ token }: { token: string }) {
               <thead>
                 <tr>
                   <th>Stock</th>
-                  <th>Price change</th>
+                  <th>Cash price change %</th>
+                  <th>Futures OI change %</th>
+                  <th>Total option-chain OI change %</th>
                   <th>Futures structure</th>
                   <th>Decision</th>
                 </tr>
@@ -303,7 +313,9 @@ export default function FnoPanel({ token }: { token: string }) {
                         {r.symbol}
                       </button>
                     </td>
-                    <td>{r.spotChangePct?.toFixed(2) ?? "—"}%</td>
+                    <td>{percent(r.spotChangePct)}</td>
+                    <td>{percent(r.futuresOiChangePct)}</td>
+                    <td>Not verified</td>
                     <td>{r.futuresStructure ?? "Not evaluated"}</td>
                     <td>{r.decision}</td>
                   </tr>
@@ -357,6 +369,17 @@ export default function FnoPanel({ token }: { token: string }) {
           {stock.optionChain && (
             <>
               <h3>Option-chain observations</h3>
+              <p>
+                Returned strikes only; total-chain completeness is not verified.
+                These option OI observations are separate from futures OI.
+              </p>
+              <p>
+                Returned call OI change:{" "}
+                {percent(stock.optionChain.callOiChangePct)}
+                {" · "}Returned put OI change:{" "}
+                {percent(stock.optionChain.putOiChangePct)}. Comparisons use the
+                provider’s previous-OI fields.
+              </p>
               <p>
                 Expiry {stock.optionChain.expiry} · {stock.optionChain.strikes}{" "}
                 strikes · OI PCR{" "}

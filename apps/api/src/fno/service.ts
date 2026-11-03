@@ -13,7 +13,7 @@ import {
 import { loadUniverse, Quotes } from "./provider";
 import { analyze } from "../news-risk/ai";
 import { BacktestInput, backtest } from "./backtest";
-import { completed, indicators } from "./technicals";
+import { completed, indicators, chartSeries } from "./technicals";
 export class FnoService {
   private cancelling = new Set<string>();
   private backtesting = new Set<string>();
@@ -87,6 +87,7 @@ export class FnoService {
             status: rows.length ? "available" : "unavailable",
             intradayAccess,
             ...indicators(rows),
+            chart: chartSeries(rows),
           });
         } catch {
           frames.push({

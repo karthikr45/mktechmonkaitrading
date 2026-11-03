@@ -35,6 +35,15 @@ advanced paper/replay tools still contain synthetic fixtures and are not live-da
 
 ## How to exercise the new flows
 
+Market charts is now a primary navigation item. Select a current F&O stock symbol
+and fetch provider data to display candlesticks, EMA20/EMA50 overlays, volume and
+RSI across all six timeframes. Charts retain the latest 120 completed bars and use
+the preceding history for indicator warmup. Optional refresh runs every 60 seconds
+while the page is visible. It is polling of completed candles, not tick-by-tick charting;
+developing candles are excluded and closed sessions remain historical. Refresh
+failures retain the prior snapshot with a visible warning. Full live candle building,
+pan/zoom and drawing tools remain pending.
+
 Open F&O scanner. Enter an exchange stock symbol under six-timeframe technical
 analysis and choose Analyse stock. The response is an on-demand snapshot; it does
 not become a continuously streaming signal. Current EOD/week/month bars are excluded.

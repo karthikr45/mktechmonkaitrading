@@ -1,7 +1,19 @@
 import { expect, it } from "vitest";
-import { completed, indicators } from "./technicals";
+import { completed, indicators, chartSeries } from "./technicals";
 import type { Candle } from "./analytics";
 const bar = (date: string): Candle => [date, 100, 100, 100, 100, 1000, 0];
+it("charts retain actual OHLCV and use earlier history for overlay warmup", () => {
+  const rows = Array.from({ length: 180 }, (_, i) =>
+    bar(new Date(Date.UTC(2026, 0, i + 1)).toISOString()),
+  );
+  const chart = chartSeries(rows);
+  expect(chart).toHaveLength(120);
+  expect(chart[0].time).toBe(rows[60][0]);
+  expect(chart[0].ema50).toBe(100);
+  expect(chart[0].rsi).toBe(50);
+  expect(chart[0].volume).toBe(1000);
+  expect(chartSeries(rows.slice(0, 3))[0].ema20).toBeNull();
+});
 it("flat markets have neutral RSI, zero MACD/ATR/ADX and no artificial trend", () => {
   const r = indicators(
     Array.from({ length: 60 }, (_, i) =>

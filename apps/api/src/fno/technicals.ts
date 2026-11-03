@@ -1,4 +1,24 @@
-import { type Candle, technical } from "./analytics";
+import { type Candle, technical, rsi } from "./analytics";
+
+export function chartSeries(rows: Candle[]) {
+  const closes = rows.map((r) => r[4]);
+  const e20 = emaSeries(closes, 20),
+    e50 = emaSeries(closes, 50);
+  const start = Math.max(0, rows.length - 120);
+  return rows
+    .slice(start)
+    .map((r, i) => ({
+      time: r[0],
+      open: r[1],
+      high: r[2],
+      low: r[3],
+      close: r[4],
+      volume: r[5],
+      ema20: e20[start + i],
+      ema50: e50[start + i],
+      rsi: rsi(closes.slice(0, start + i + 1)),
+    }));
+}
 
 function emaSeries(values: number[], period: number) {
   const result: (number | null)[] = values.map(() => null);

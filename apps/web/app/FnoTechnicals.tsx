@@ -1,6 +1,8 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import PriceChart, { type ChartBar } from "./PriceChart";
 type Frame = {
+  chart?: ChartBar[];
   frame: string;
   status: string;
   reason?: string;
@@ -30,6 +32,7 @@ type Frame = {
   camarilla?: { support: number[]; resistance: number[] } | null;
 };
 export default function FnoTechnicals({ token }: { token: string }) {
+  const [autoRefresh, setAutoRefresh] = useState(false);
   const [symbol, setSymbol] = useState(""),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
@@ -39,9 +42,52 @@ export default function FnoTechnicals({ token }: { token: string }) {
     limitation: string;
     stock: { symbol: string };
   }>();
+  const trackedSymbol = report?.stock.symbol;
+  useEffect(() => {
+    if (!autoRefresh || !trackedSymbol) return;
+    const controller = new AbortController();
+    let active = true,
+      inFlight = false;
+    const timer = setInterval(async () => {
+      if (inFlight || document.hidden) return;
+      inFlight = true;
+      setBusy(true);
+      try {
+        const r = await fetch("/api/fno/technicals", {
+          method: "POST",
+          signal: controller.signal,
+          headers: {
+            Authorization: "Bearer " + token,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ symbol: trackedSymbol }),
+        });
+        const d = await r.json();
+        if (!r.ok) throw Error();
+        if (active) {
+          setReport(d.result);
+          setError("");
+        }
+      } catch {
+        if (active)
+          setError(
+            "Automatic update failed. Displayed chart is the last successful snapshot; check its timestamp.",
+          );
+      } finally {
+        inFlight = false;
+        if (active) setBusy(false);
+      }
+    }, 60000);
+    return () => {
+      active = false;
+      controller.abort();
+      clearInterval(timer);
+    };
+  }, [autoRefresh, trackedSymbol, token]);
   const n = (v?: number | null) =>
     typeof v === "number" ? v.toFixed(2) : "Unavailable";
   async function run() {
+    setAutoRefresh(false);
     setBusy(true);
     setError("");
     try {
@@ -82,7 +128,21 @@ export default function FnoTechnicals({ token }: { token: string }) {
       {error && <p role="alert">{error}</p>}
       {report && (
         <>
+          <label>
+            <input
+              type="checkbox"
+              checked={autoRefresh}
+              onChange={(e) => setAutoRefresh(e.target.checked)}
+            />{" "}
+            Refresh this stock every 60 seconds while this tab is visible
+          </label>
+          <p>
+            Updates use completed candles, not every market tick. Developing
+            candles are excluded. Closed-market data remains the last completed
+            session.
+          </p>
           <h3>{report.stock.symbol}</h3>
+          <PriceChart frames={report.frames} symbol={report.stock.symbol} />
           <p>
             Retrieved {report.retrievedAt}. {report.limitation}
           </p>

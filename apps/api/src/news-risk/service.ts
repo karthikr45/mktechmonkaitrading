@@ -46,6 +46,33 @@ export class NewsRiskService {
       return Settings.parse(row.settings);
     });
   }
+  async watchStock(t: string, key: string, name: string) {
+    await this.settings(t);
+    return this.store.scoped(t, async (m) => {
+      const [row] = await m.query(
+        "SELECT settings FROM trader_settings WHERE tenant_id=$1 FOR UPDATE",
+        [t],
+      );
+      const settings = Settings.parse(row.settings);
+      if (!settings.watchlist.some((w) => w.key === key)) {
+        if (settings.watchlist.length >= 30)
+          throw new BadRequestException(
+            "Watchlist limit reached; remove a stock in News & AI research first",
+          );
+        settings.watchlist.push({ key, name, aliases: [name] });
+        await m.query(
+          "UPDATE trader_settings SET settings=$2,updated_at=now() WHERE tenant_id=$1",
+          [t, JSON.stringify(settings)],
+        );
+        await this.store.record(m, t, "trader.watchlist.added", { key, name });
+      }
+      return {
+        symbol: name,
+        enabled: settings.enabled,
+        refreshMinutes: settings.refreshMinutes,
+      };
+    });
+  }
   async saveSettings(t: string, body: unknown) {
     const settings = Settings.parse(body);
     if (

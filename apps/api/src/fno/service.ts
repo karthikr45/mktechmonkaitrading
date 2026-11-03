@@ -9,8 +9,10 @@ import {
   candles,
   technical,
   chain,
+  verifyChain,
 } from "./analytics";
 import { loadUniverse, Quotes } from "./provider";
+import { getUpstoxNews, RatioResponse } from "../news-risk/providers";
 import { analyze } from "../news-risk/ai";
 import { BacktestInput, backtest } from "./backtest";
 import { completed, indicators, chartSeries } from "./technicals";
@@ -18,11 +20,217 @@ export class FnoService {
   private cancelling = new Set<string>();
   private backtesting = new Set<string>();
   private analysing = new Set<string>();
+  private researching = new Set<string>();
   constructor(
     private store: LocalStore,
     private request: (tenant: string, path: string) => Promise<unknown>,
     private master = loadUniverse,
   ) {}
+  async symbols() {
+    const master = await this.master();
+    return { stocks: master.stocks, publishedAt: master.publishedAt };
+  }
+  async stockSnapshot(t: string, symbol: string) {
+    const master = await this.master();
+    const stock = master.stocks.find(
+      (s) => s.symbol.toUpperCase() === symbol.trim().toUpperCase(),
+    );
+    if (!stock)
+      throw new BadRequestException(
+        "Select a stock from the current F&O universe",
+      );
+    const today = new Date(Date.now() + 330 * 60000).toISOString().slice(0, 10);
+    const from = new Date(Date.now() - 15 * 86400000)
+      .toISOString()
+      .slice(0, 10);
+    const tasks = await Promise.allSettled([
+      this.request(
+        t,
+        "/v2/market-quote/quotes?instrument_key=" +
+          encodeURIComponent([stock.key, stock.future].join(",")),
+      ).then(Quotes.parse),
+      this.request(
+        t,
+        `/v2/option/chain?instrument_key=${encodeURIComponent(stock.key)}&expiry_date=${stock.expiry}`,
+      ).then((v) => chain(v, stock.key, stock.expiry)),
+      this.request(
+        t,
+        `/v2/historical-candle/${encodeURIComponent(stock.future)}/day/${today}/${from}`,
+      ).then((v) => candles(v, today)),
+      this.request(
+        t,
+        `/v2/historical-candle/${encodeURIComponent(stock.key)}/day/${today}/${from}`,
+      ).then((v) => candles(v, today)),
+    ] as const);
+    const [quotes, options, history, cashHistory] = tasks;
+    let optionChain:
+      | (ReturnType<typeof chain> & {
+          completeness?: string;
+          expectedContracts?: number;
+          maxPain: number | null;
+        })
+      | null = options.status === "fulfilled" ? options.value : null;
+    if (optionChain) {
+      try {
+        optionChain = verifyChain(
+          optionChain,
+          await this.request(
+            t,
+            `/v2/option/contract?instrument_key=${encodeURIComponent(stock.key)}&expiry_date=${stock.expiry}`,
+          ),
+          stock.key,
+        );
+      } catch {
+        /* Keep returned-strike evidence; never assert completeness on failure. */
+      }
+    }
+    const values =
+      quotes.status === "fulfilled" ? Object.values(quotes.value.data) : [];
+    const spot = values.find((q) => q.instrument_token === stock.key) ?? null;
+    const future =
+      values.find((q) => q.instrument_token === stock.future) ?? null;
+    const baseline =
+      history.status === "fulfilled" ? history.value.at(-1) : undefined;
+    const cashBaseline =
+      cashHistory.status === "fulfilled" ? cashHistory.value.at(-1) : undefined;
+    const baselineValid =
+      baseline &&
+      cashBaseline &&
+      baseline[0].slice(0, 10) === cashBaseline[0].slice(0, 10) &&
+      Date.now() - Date.parse(baseline[0]) < 96 * 3600000;
+    const oiChange = baselineValid ? change(future?.oi, baseline[6]) : null;
+    const priceChange = future
+      ? change(future.last_price, future.last_price - future.net_change)
+      : null;
+    const filters = (await this.settings(t)).filters;
+    const fresh = (q: typeof spot) =>
+      q?.last_trade_time !== undefined &&
+      Date.now() - q.last_trade_time <= 60000 &&
+      q.last_trade_time <= Date.now() + 60000;
+    return {
+      stock,
+      retrievedAt: new Date().toISOString(),
+      source: "Upstox",
+      spot,
+      future,
+      spotChangePct: spot
+        ? change(spot.last_price, spot.last_price - spot.net_change)
+        : null,
+      futuresPriceChangePct: priceChange,
+      futuresOiChangePct: oiChange,
+      baselineDate: baselineValid ? baseline[0] : null,
+      futuresStructure: structure(priceChange, oiChange, filters),
+      quoteFreshness:
+        fresh(spot) && fresh(future)
+          ? "Recent provider quote; confirm exchange session before trading"
+          : "Stale, closed-session or unavailable quote; not a live trade signal",
+      optionChain,
+      failures: tasks.flatMap((r, i) =>
+        r.status === "rejected"
+          ? [
+              [
+                "Cash/futures quotes",
+                "Option chain",
+                "Futures OI baseline",
+                "Cash baseline",
+              ][i] + " unavailable: provider request or validation failed",
+            ]
+          : [],
+      ),
+      limitation:
+        "Cash price %, futures price/OI % and returned option-chain OI % are separate observations. Thresholds are user-defined, not historically optimized. Chain retrieval time is not an exchange quote timestamp. No trade qualification without restrictions, liquidity, market context and news confirmation.",
+    };
+  }
+  async stockResearch(t: string, symbol: string) {
+    if (this.researching.has(t))
+      throw new BadRequestException(
+        "Stock AI research is already running; wait for it to finish",
+      );
+    this.researching.add(t);
+    try {
+      const snapshot = await this.stockSnapshot(t, symbol);
+      const key = snapshot.stock.key;
+      const [newsResult, fundamentalsResult] = await Promise.allSettled([
+        getUpstoxNews((path) => this.request(t, path), [key]),
+        this.request(
+          t,
+          `/v2/fundamentals/${key.split("|")[1]}/key-ratios`,
+        ).then(RatioResponse.parse),
+      ]);
+      const news =
+        newsResult.status === "fulfilled"
+          ? newsResult.value.items
+              .filter(
+                (a) =>
+                  a.publishedAt &&
+                  Date.now() - Date.parse(a.publishedAt) < 72 * 3600000,
+              )
+              .slice(0, 15)
+          : [];
+      const fundamentals =
+        fundamentalsResult.status === "fulfilled"
+          ? fundamentalsResult.value.data
+          : [];
+      const id = randomUUID();
+      const evidence = [
+        {
+          id: `stock:${id}`,
+          title: `${snapshot.stock.symbol} provider observation`,
+          summary: JSON.stringify({
+            symbol: snapshot.stock.symbol,
+            spot: snapshot.spot,
+            future: snapshot.future,
+            futuresOiChangePct: snapshot.futuresOiChangePct,
+            baselineDate: snapshot.baselineDate,
+            freshness: snapshot.quoteFreshness,
+            optionChain: snapshot.optionChain
+              ? {
+                  expiry: snapshot.optionChain.expiry,
+                  pcr: snapshot.optionChain.pcr,
+                  oiChangePct: snapshot.optionChain.totalOiChangePct,
+                  callWall: snapshot.optionChain.callWall,
+                  putWall: snapshot.optionChain.putWall,
+                }
+              : null,
+          }),
+          publishedAt: snapshot.retrievedAt,
+          source: "Upstox quotes and chain",
+          instruments: [key],
+          url: "https://upstox.com/developer/api-documentation/",
+        },
+        ...news,
+      ];
+      const coverage = [
+        snapshot.limitation,
+        news.length
+          ? `${news.length} recent stock articles; coverage may be incomplete`
+          : "No recent stock news was returned; do not infer that no event exists",
+        "Fundamental ratios have no verified reporting period and are shown separately; do not treat retrieval time as financial-statement recency.",
+      ];
+      const ai = await analyze(
+        evidence,
+        coverage,
+        `Explain the supplied ${snapshot.stock.symbol} evidence for a trader: distinguish cash price, futures price/OI and option-chain OI; discuss only supplied news, freshness and missing confirmations. Do not infer buying/writing from OI alone. Do not recommend a trade, invent a target, claim a success probability or infer broader market direction. Cite evidence IDs for every finding.`,
+      );
+      const result = {
+        symbol: snapshot.stock.symbol,
+        retrievedAt: new Date().toISOString(),
+        ai,
+        news,
+        fundamentals,
+        coverage,
+      };
+      await this.store.scoped(t, (m) =>
+        m.query(
+          "INSERT INTO research_runs(tenant_id,id,kind,request,result) VALUES($1,$2,'stock-research',$3,$4)",
+          [t, id, JSON.stringify({ symbol, evidence }), JSON.stringify(result)],
+        ),
+      );
+      return { id, ...result };
+    } finally {
+      this.researching.delete(t);
+    }
+  }
   async technicals(t: string, symbol: string) {
     if (this.analysing.has(t))
       throw new BadRequestException("Technical analysis is already running");

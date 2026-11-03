@@ -8,6 +8,7 @@ import {
   technical,
   candles,
   chain,
+  verifyChain,
 } from "./analytics";
 import { universe } from "./provider";
 it("classifies four futures structures with inclusive thresholds", () => {
@@ -83,4 +84,67 @@ it("rejects mixed-expiry chains and does not invent max pain", () => {
   expect(result.callOiChangePct).toBeNull();
   expect(result.maxPain).toBeNull();
   expect(() => chain(payload, "k", "2026-11-24")).toThrow();
+});
+
+it("computes max pain only with complete matching uniform-lot contracts", () => {
+  const side = (key: string, oi: number) => ({
+    instrument_key: key,
+    market_data: {
+      oi,
+      prev_oi: oi,
+      volume: 1,
+      bid_price: 1,
+      ask_price: 2,
+      ltp: 1,
+    },
+  });
+  const rows = [
+    {
+      strike_price: 100,
+      call_options: side("c1", 100),
+      put_options: side("p1", 1),
+    },
+    {
+      strike_price: 110,
+      call_options: side("c2", 1),
+      put_options: side("p2", 100),
+    },
+  ].map((r) => ({ ...r, underlying_key: "k", expiry: "2026-12-01" }));
+  const base = chain({ status: "success", data: rows }, "k", "2026-12-01");
+  const contracts = rows.flatMap((r) =>
+    ["CE", "PE"].map((type) => ({
+      instrument_key:
+        type === "CE"
+          ? r.call_options.instrument_key
+          : r.put_options.instrument_key,
+      strike_price: r.strike_price,
+      instrument_type: type,
+      underlying_key: "k",
+      expiry: "2026-12-01",
+      lot_size: 10,
+    })),
+  );
+  // Symmetric payout has tied minima, which must not produce a spurious unique strike.
+  expect(
+    verifyChain(base, { status: "success", data: contracts }, "k").maxPain,
+  ).toBeNull();
+  rows[0].call_options.market_data.oi = 200;
+  const stronger = chain({ status: "success", data: rows }, "k", "2026-12-01");
+  expect(
+    verifyChain(stronger, { status: "success", data: contracts }, "k").maxPain,
+  ).toBe(100);
+  expect(
+    verifyChain(stronger, { status: "success", data: contracts.slice(1) }, "k")
+      .maxPain,
+  ).toBeNull();
+  expect(
+    verifyChain(
+      stronger,
+      {
+        status: "success",
+        data: contracts.map((c, i) => ({ ...c, lot_size: i ? 10 : 20 })),
+      },
+      "k",
+    ).maxPain,
+  ).toBeNull();
 });

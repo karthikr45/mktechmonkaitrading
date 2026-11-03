@@ -1,3 +1,4 @@
+import { UpstoxGlobal } from "./global-markets/upstox";
 import "reflect-metadata";
 import { NestFactory } from "@nestjs/core";
 import {
@@ -50,7 +51,10 @@ const fno = new FnoService(store, (t, path) =>
     t === "mk-demo" ? process.env.UPSTOX_ACCESS_TOKEN : undefined,
   ),
 );
-const globalMarkets = new GlobalMarkets();
+const globalQuotes = new UpstoxGlobal((path) =>
+  upstox("mk-demo").researchRequest(path, process.env.UPSTOX_ACCESS_TOKEN),
+);
+const globalMarkets = new GlobalMarkets((items) => globalQuotes.quotes(items));
 const newsRisk = new NewsRiskService(store, upstox, globalMarkets);
 function token(req: Request) {
   return req.headers.authorization?.replace(/^Bearer /, "") ?? "";
@@ -84,6 +88,53 @@ async function validated<T>(fn: () => Promise<T>) {
 @ApiBearerAuth()
 @Controller("v1")
 class Api {
+  @Get("fno/symbols") async fnoSymbols(@Req() req: Request) {
+    return validated(async () => {
+      await tenant(req);
+      return fno.symbols();
+    });
+  }
+  @Post("fno/stock") async fnoStock(
+    @Req() req: Request,
+    @Body() body: unknown,
+  ) {
+    return validated(async () => {
+      const input = z
+        .object({ symbol: z.string().trim().min(1).max(40) })
+        .strict()
+        .parse(body);
+      return fno.stockSnapshot(await tenant(req), input.symbol);
+    });
+  }
+  @Post("fno/stock/watch") async watchStock(
+    @Req() req: Request,
+    @Body() body: unknown,
+  ) {
+    return validated(async () => {
+      const t = await tenant(req);
+      const input = z
+        .object({ symbol: z.string().trim().min(1).max(40) })
+        .strict()
+        .parse(body);
+      const stock = (await fno.symbols()).stocks.find(
+        (s) => s.symbol.toUpperCase() === input.symbol.toUpperCase(),
+      );
+      if (!stock) throw new BadRequestException("Select a current F&O stock");
+      return newsRisk.watchStock(t, stock.key, stock.symbol);
+    });
+  }
+  @Post("fno/stock/research") async stockResearch(
+    @Req() req: Request,
+    @Body() body: unknown,
+  ) {
+    return validated(async () => {
+      const input = z
+        .object({ symbol: z.string().trim().min(1).max(40) })
+        .strict()
+        .parse(body);
+      return fno.stockResearch(await tenant(req), input.symbol);
+    });
+  }
   @Post("fno/technicals") async fnoTechnicals(
     @Req() req: Request,
     @Body() body: unknown,

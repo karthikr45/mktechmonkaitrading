@@ -67,3 +67,15 @@ When markets are closed, show last-session data as closed/EOD, never as live.
 Execution remains paper-only. Enabling real orders is a separate implementation and
 acceptance scope. Ollama explanations summarize verified evidence; numerical signals
 and historical statistics must come from tested calculations, not generated text.
+
+### Verified access and remaining gates (2026-11-03)
+
+Stock workspace now verifies provider cash/futures/chain snapshots and full-feed
+OI/average price/volume, with local evidence-linked stock analysis and watchlist
+news monitoring. Global Upstox indices supplement Twelve Data stock/FX snapshots.
+See CLIENT_ACCEPTANCE.md for observed results and honest coverage limits.
+Expired-contract API access is blocked by UDAPI1149 (Upstox Plus required).
+Twelve Data quota is eight credits/minute; `TWELVE_DATA_CREDITS_PER_MINUTE`
+controls bounded queued quote batches. Neither integration is full production
+acceptance; open-session continuity, complete trade qualification, reporting and
+backtesting gates remain outstanding.

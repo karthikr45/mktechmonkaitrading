@@ -60,7 +60,7 @@ export default function GlobalOutlook({
         }
       } catch {
         if (active)
-          setError("Global outlook unavailable. Check System health.");
+          setError("Global outlook unavailable. Check Data & AI status.");
       }
     };
     void refresh();
@@ -117,7 +117,7 @@ export default function GlobalOutlook({
           {new Date(data.checkedAt).toLocaleString("en-IN", {
             timeZone: "Asia/Kolkata",
           })}{" "}
-          IST · Refresh every 15 minutes ·{" "}
+          IST · Upstox: 1-minute cache; US stocks: 15-minute cache ·{" "}
           {overdue ? "Stale snapshot" : "Not a live tick feed"}
         </p>
         {!data.configured && (
@@ -282,9 +282,10 @@ export default function GlobalOutlook({
         <section className="panel">
           <h2>Coverage & freshness</h2>
           <p>
-            Quotes are cached for 15 minutes. Unavailable instruments have no
-            substitute prices. A partial region cannot establish the direction
-            of the whole market.
+            Upstox index quotes are cached for one minute; Twelve Data stock
+            quotes for 15 minutes. Unavailable instruments have no substitute
+            prices. A partial region cannot establish the direction of the whole
+            market.
           </p>
           {data.limitations.map((l) => (
             <p key={l}>{l}</p>

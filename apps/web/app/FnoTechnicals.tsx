@@ -31,9 +31,15 @@ type Frame = {
   } | null;
   camarilla?: { support: number[]; resistance: number[] } | null;
 };
-export default function FnoTechnicals({ token }: { token: string }) {
+export default function FnoTechnicals({
+  token,
+  initialSymbol = "",
+}: {
+  token: string;
+  initialSymbol?: string;
+}) {
   const [autoRefresh, setAutoRefresh] = useState(false);
-  const [symbol, setSymbol] = useState(""),
+  const [symbol, setSymbol] = useState(initialSymbol),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   const [report, setReport] = useState<{

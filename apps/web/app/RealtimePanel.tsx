@@ -2,6 +2,9 @@
 import { useEffect, useState } from "react";
 import { SSEParser } from "../lib/sse";
 type Quote = {
+  openInterest?: number;
+  averageTradedPrice?: number;
+  tradedVolume?: number;
   instrument: string;
   price: string;
   previousClose: string | null;
@@ -17,13 +20,21 @@ type Status = {
   marketStatus: Record<string, string>;
   quotes: Quote[];
 };
-export default function RealtimePanel({ token }: { token: string }) {
+export default function RealtimePanel({
+  token,
+  instrumentKeys,
+}: {
+  token: string;
+  instrumentKeys?: string[];
+}) {
   const [history, setHistory] = useState<Record<string, Quote[]>>({});
   const [status, setStatus] = useState<Status>();
   const [quotes, setQuotes] = useState<Record<string, Quote>>({});
   const [transport, setTransport] = useState("Connecting to local API…");
   const [accessToken, setAccessToken] = useState("");
-  const [keys, setKeys] = useState("NSE_INDEX|Nifty 50\nNSE_INDEX|Nifty Bank");
+  const [keys, setKeys] = useState(
+    instrumentKeys?.join("\n") ?? "NSE_INDEX|Nifty 50\nNSE_INDEX|Nifty Bank",
+  );
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [now, setNow] = useState(Date.now());
@@ -285,6 +296,9 @@ export default function RealtimePanel({ token }: { token: string }) {
                 <th>Instrument</th>
                 <th>LTP</th>
                 <th>Previous close</th>
+                <th>OI</th>
+                <th>Average traded price</th>
+                <th>Traded volume</th>
                 <th>Last trade (IST)</th>
                 <th>Freshness</th>
               </tr>
@@ -295,6 +309,9 @@ export default function RealtimePanel({ token }: { token: string }) {
                   <td>{q.instrument}</td>
                   <td>{q.price}</td>
                   <td>{q.previousClose ?? "—"}</td>
+                  <td>{q.openInterest ?? "—"}</td>
+                  <td>{q.averageTradedPrice ?? "—"}</td>
+                  <td>{q.tradedVolume ?? "—"}</td>
                   <td>
                     {new Date(q.timestamp).toLocaleString("en-IN", {
                       timeZone: "Asia/Kolkata",

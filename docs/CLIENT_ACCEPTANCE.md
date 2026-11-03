@@ -4,21 +4,21 @@ The complete client request remains open. Working code is not equivalent to full
 production acceptance. The current client-facing research flow uses provider data;
 advanced paper/replay tools still contain synthetic fixtures and are not live-data features.
 
-| Master prompt area | Implemented and verified | Still required |
-| --- | --- | --- |
-| 1, 30: configurable filters | Price/futures OI thresholds; persisted scanner settings; historical-study costs/holding period | Independent options-OI filters, score/direction commands and all filter execution |
-| 2: market regime | Global snapshot framework, seven configured US stock quotes | All regional feeds, FII/DII, complete regime scoring |
-| 3–5: universe, price and futures structure | Dynamic broker universe, cash/futures observations, four price/OI classes | Official eligibility/ban checks and full liquidity exclusions |
-| 6–7: chain and OI | Expiry-specific returned-strike OI/PCR/walls; futures OI displayed separately | Complete-chain verification, max pain, full contract-level UI and writing confirmation |
-| 8: technicals | On-demand 5m, 15m, 1h, daily, weekly and monthly EMA/RSI/MACD/ADX/ATR | Confirmed crossovers/divergences and scanner qualification integration |
-| 9: VWAP | Not implemented | Accurate session VWAP and rejection/breakout tracking |
-| 10–11: levels | Classic, Fibonacci and Camarilla pivots from completed bars on six frames | Swing selection, Fibonacci retracements, confluence and validated breakout levels |
-| 12: volume | Last completed bar vs previous 20 bars on each frame | Intraday time-of-day normalized comparisons and breakout confirmation |
-| 13–15: delivery, sector, fundamentals/news | RSS/company disclosure and local evidence-linked AI pipeline in part | Delivery reports, sector comparisons, full financial/event coverage |
-| 16–26: decisions, ranks, trades and warnings | Missing-evidence gating; no fabricated trade qualification | Full risk-aware scoring, entry/SL/targets, option risk, confidence calibration and warnings |
-| 27–29: output and provenance | Saved observations/studies, source timestamps, missing fields, EOD vs intraday labels | Unified daily report, top-ten/top-five qualified tables, scheduled alerts |
-| Client addition: historical success | Real active-contract daily futures outcome study, chronological split, costs/slippage, ledger, sample intervals, retained candles and hash | Expired contracts, historical universe, intraday/portfolio backtesting, margin, stops, rollover and out-of-sample threshold optimization |
-| Word document additions | Multi-frame EMA/RSI/pivots | Rollover comparison/cost, 3–5 year fundamentals, attributed expert opinions |
+| Master prompt area                           | Implemented and verified                                                                                                                                        | Still required                                                                                                                           |
+| -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| 1, 30: configurable filters                  | Price/futures OI thresholds; persisted scanner settings; historical-study costs/holding period                                                                  | Independent options-OI filters, score/direction commands and all filter execution                                                        |
+| 2: market regime                             | Upstox India/global indices, GIFT Nifty, seven configured US stock snapshots and USD/INR + USD/JPY mappings                                                     | Remaining regional/commodity feeds, confirmed market-session calendars, FII/DII and complete regime scoring                              |
+| 3–5: universe, price and futures structure   | Dynamic broker universe, cash/futures observations, four price/OI classes                                                                                       | Official eligibility/ban checks and full liquidity exclusions                                                                            |
+| 6–7: chain and OI                            | Expiry-specific strike table, separate cash/futures/option OI changes, PCR/change/walls; contract-list completeness and conditional max pain in Stock workspace | Writing confirmation, independently timestamped chains and verified volume units                                                         |
+| 8: technicals                                | On-demand 5m, 15m, 1h, daily, weekly and monthly EMA/RSI/MACD/ADX/ATR                                                                                           | Confirmed crossovers/divergences and scanner qualification integration                                                                   |
+| 9: VWAP                                      | Not implemented                                                                                                                                                 | Accurate session VWAP and rejection/breakout tracking                                                                                    |
+| 10–11: levels                                | Classic, Fibonacci and Camarilla pivots from completed bars on six frames                                                                                       | Swing selection, Fibonacci retracements, confluence and validated breakout levels                                                        |
+| 12: volume                                   | Last completed bar vs previous 20 bars on each frame                                                                                                            | Intraday time-of-day normalized comparisons and breakout confirmation                                                                    |
+| 13–15: delivery, sector, fundamentals/news   | RSS/company disclosure and local evidence-linked AI pipeline in part                                                                                            | Delivery reports, sector comparisons, full financial/event coverage                                                                      |
+| 16–26: decisions, ranks, trades and warnings | Missing-evidence gating; no fabricated trade qualification                                                                                                      | Full risk-aware scoring, entry/SL/targets, option risk, confidence calibration and warnings                                              |
+| 27–29: output and provenance                 | Saved observations/studies, source timestamps, missing fields, EOD vs intraday labels                                                                           | Unified daily report, top-ten/top-five qualified tables, scheduled alerts                                                                |
+| Client addition: historical success          | Real active-contract daily futures outcome study, chronological split, costs/slippage, ledger, sample intervals, retained candles and hash                      | Expired contracts, historical universe, intraday/portfolio backtesting, margin, stops, rollover and out-of-sample threshold optimization |
+| Word document additions                      | Multi-frame EMA/RSI/pivots                                                                                                                                      | Rollover comparison/cost, 3–5 year fundamentals, attributed expert opinions                                                              |
 
 ## Verification performed
 
@@ -57,7 +57,6 @@ CLI provider acceptance: `pnpm --filter @mk/api exec tsx src/check-fno-live.ts S
 This makes real provider requests and saves real reports in the local demo tenant.
 Database fixture acceptance: `pnpm --filter @mk/api exec tsx src/check-fno.ts`.
 
-
 ## Client interface verification — 3 November 2026
 
 The primary interface now exposes Today, Charts & indicators, Live prices,
@@ -80,3 +79,53 @@ PostgreSQL, analytics, Ollama reachability and installed model, plus actual feed
 state and global quote coverage. Ollama reachability is not a claim that the latest
 briefing succeeded. Full production readiness and complete client coverage remain
 subject to the gaps documented above.
+
+## Stock workflow acceptance — 3 November 2026, evening
+
+The default Stock workspace resolves 218 symbols from the current Upstox master.
+A single symbol loads cash/futures quotes, previous-session futures OI comparison,
+30-second option-chain snapshots and selected-instrument WebSocket controls.
+The six-timeframe chart form is preselected to that same stock. The real feed now
+subscribes in full mode and handles futures OI, volume and average traded price,
+including an OI-only change without a price change. These are provider fields;
+full tick reconstruction and a session VWAP rejection/breakout system remain open.
+
+RELIANCE live-provider verification returned 49 strikes, matching the expiry
+contract list for 2026-11-23. Cash price change, futures price change, futures OI
+change and combined returned option OI change are separate. Max pain is calculated
+only when all contract identities/strikes/sides match, lots are uniform, OI exists,
+and the payout minimum is unique. It is neither a price forecast nor a freshness
+assertion. Old last-trade timestamps cannot become fresh because a REST request
+was made recently.
+
+Stock research fetched nine recent articles and seven company/sector ratios.
+The initial Ollama report failed validation; tighter bounded output and permitted
+citation IDs produced a generated report with three validated findings. Source
+financial reporting periods remain unknown. The report and input evidence are
+saved to PostgreSQL. A stock can be added to scheduled in-app news monitoring
+without manually entering an instrument key. Local monitoring requires the server
+to remain running; external notifications are not configured.
+
+Upstox returned GIFT, Hang Seng, Nikkei, Dow, S&P, US Tech 100, FTSE, DAX and CAC,
+plus Nifty, Bank Nifty and India VIX. Per-instrument source intervals and actual
+trade times are retained. Session closure for international instruments is not
+inferred from wall-clock hours; older observations are marked stale. Regional
+colour remains gated by coverage. Upstox USDINR/Brent documented keys were rejected
+by both V2 full quote and V3 LTP. Twelve Data returned USD/INR and USD/JPY instead;
+local mappings were added. Twelve Data's confirmed eight-credit-per-minute limit
+is handled with cached per-symbol batches and queued remaining symbols. Each
+symbol is normally refreshed every 15 minutes; this is not streaming FX.
+
+**Proven access blocker:** expired-contract history returned HTTP 401 / UDAPI1149,
+requiring Upstox Plus. The user has been asked to enable access. No subscription
+purchase or credential change is performed by the app.
+
+Still open: China/Korea/Taiwan and remaining market coverage, exact delivery and
+turnover reports, FII/DII, events, full market-regime scoring, complete liquidity
+and restriction qualification, live candle reconstruction, historical options/
+expired futures studies, historical threshold optimization and open-session
+acceptance. These are not marked complete by passing transport tests.
+
+Run `pnpm --filter @mk/api exec tsx src/check-stock-live.ts SYMBOL` to exercise
+real stock quotes/chain/completeness, source news/ratios and local AI with saved
+research evidence. Credentials and `.env` stay local.

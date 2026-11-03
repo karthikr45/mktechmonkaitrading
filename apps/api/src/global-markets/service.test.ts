@@ -111,3 +111,52 @@ describe("Global market evidence", () => {
     ).toBe(true);
   });
 });
+
+it("queues symbols beyond the configured credit window and retains valid cached quotes", async () => {
+  vi.stubEnv("TWELVE_DATA_API_KEY", "fixture-key");
+  vi.stubEnv("TWELVE_DATA_CREDITS_PER_MINUTE", "2");
+  vi.stubEnv(
+    "GLOBAL_MARKET_SYMBOLS",
+    '{"NVDA":"NVDA","MSFT":"MSFT","GOOGL":"GOOGL"}',
+  );
+  let clock = now;
+  const time = vi.spyOn(Date, "now").mockImplementation(() => clock);
+  const batches: string[][] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: URL | string) => {
+      const url = new URL(String(input));
+      if (url.hostname !== "api.twelvedata.com")
+        return new Response("<rss><channel/></rss>");
+      const symbols = url.searchParams.get("symbol")!.split(",");
+      batches.push(symbols);
+      const values = Object.fromEntries(
+        symbols.map((symbol) => [
+          symbol,
+          { ...quote, symbol, timestamp: clock / 1000 },
+        ]),
+      );
+      return new Response(
+        JSON.stringify(symbols.length === 1 ? values[symbols[0]] : values),
+      );
+    }),
+  );
+  try {
+    const service = new GlobalMarkets();
+    const first = await service.state();
+    expect(batches).toEqual([["NVDA", "MSFT"]]);
+    expect(first.quotes.find((q) => q.id === "GOOGL")?.reason).toContain(
+      "Queued",
+    );
+    clock += 61000;
+    const next = await service.state();
+    expect(batches).toEqual([["NVDA", "MSFT"], ["GOOGL"]]);
+    expect(
+      next.quotes
+        .filter((q) => ["NVDA", "MSFT", "GOOGL"].includes(q.id))
+        .every((q) => q.state === "available"),
+    ).toBe(true);
+  } finally {
+    time.mockRestore();
+  }
+});

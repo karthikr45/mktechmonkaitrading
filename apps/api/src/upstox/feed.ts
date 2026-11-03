@@ -8,11 +8,18 @@ export const feedType = loadSync(
   resolve(repositoryRoot(), "apps/api/src/upstox/MarketDataFeed.proto"),
 ).lookupType("com.upstox.marketdatafeederv3udapi.rpc.proto.FeedResponse");
 type LTPC = { ltp?: number; ltt?: string; cp?: number };
+type FullMarket = { ltpc?: LTPC; oi?: number; atp?: number; vtt?: string };
 type WireFeed = {
   type?: string;
   currentTs?: string;
   marketInfo?: { segmentStatus?: Record<string, string> };
-  feeds?: Record<string, { ltpc?: LTPC }>;
+  feeds?: Record<
+    string,
+    {
+      ltpc?: LTPC;
+      fullFeed?: { marketFF?: FullMarket; indexFF?: { ltpc?: LTPC } };
+    }
+  >;
 };
 export interface Quote {
   instrument: string;
@@ -20,6 +27,9 @@ export interface Quote {
   previousClose: string | null;
   timestamp: string;
   receivedAt: string;
+  openInterest?: number;
+  averageTradedPrice?: number;
+  tradedVolume?: number;
   source: "upstox";
   sequence: number;
 }
@@ -105,7 +115,7 @@ export class UpstoxFeed {
       !/^\/v3\/historical-candle\/(?:intraday\/)?NSE_EQ%7C[A-Za-z0-9]+\/(?:minutes\/(?:5|15)|hours\/1|days\/1|weeks\/1|months\/1)(?:\/\d{4}-\d{2}-\d{2}\/\d{4}-\d{2}-\d{2})?$/.test(
         path,
       ) &&
-      !/^\/v2\/(news\?|market-quote\/quotes\?|option\/chain\?|historical-candle\/NSE_(?:EQ|FO)%7C[A-Za-z0-9]+\/day\/\d{4}-\d{2}-\d{2}\/\d{4}-\d{2}-\d{2}$|fundamentals\/[A-Z0-9]{12}\/key-ratios$)/.test(
+      !/^\/v2\/(news\?|market-quote\/quotes\?|option\/(?:chain|contract)\?|historical-candle\/NSE_(?:EQ|FO)%7C[A-Za-z0-9]+\/day\/\d{4}-\d{2}-\d{2}\/\d{4}-\d{2}-\d{2}$|fundamentals\/[A-Z0-9]{12}\/key-ratios$)/.test(
         path,
       )
     )
@@ -220,7 +230,7 @@ export class UpstoxFeed {
             JSON.stringify({
               guid: randomUUID(),
               method: "sub",
-              data: { mode: "ltpc", instrumentKeys: this.keys },
+              data: { mode: "full", instrumentKeys: this.keys },
             }),
           ),
         );
@@ -262,21 +272,40 @@ export class UpstoxFeed {
           for (const [instrument, feed] of Object.entries(
             decoded.feeds ?? {},
           )) {
-            if (!this.keys.includes(instrument) || !feed.ltpc) continue;
+            const full = feed.fullFeed?.marketFF;
+            const ltpc =
+              feed.ltpc ?? full?.ltpc ?? feed.fullFeed?.indexFF?.ltpc;
+            if (!this.keys.includes(instrument) || !ltpc) continue;
             const quote = normalizeQuote(
               instrument,
-              feed.ltpc,
+              ltpc,
               this.sequence + 1,
               Date.now(),
             );
             if (!quote) continue;
+            if (full) {
+              if (Number.isFinite(full.oi) && full.oi! >= 0)
+                quote.openInterest = full.oi;
+              if (Number.isFinite(full.atp) && full.atp! > 0)
+                quote.averageTradedPrice = full.atp;
+              const volume = Number(full.vtt);
+              if (
+                full.vtt !== undefined &&
+                Number.isSafeInteger(volume) &&
+                volume >= 0
+              )
+                quote.tradedVolume = volume;
+            }
             const previous = this.quotes.get(instrument);
             if (
               previous &&
               (quote.timestamp < previous.timestamp ||
                 (quote.timestamp === previous.timestamp &&
                   quote.price === previous.price &&
-                  quote.previousClose === previous.previousClose))
+                  quote.previousClose === previous.previousClose &&
+                  quote.openInterest === previous.openInterest &&
+                  quote.averageTradedPrice === previous.averageTradedPrice &&
+                  quote.tradedVolume === previous.tradedVolume))
             )
               continue;
             this.sequence++;

@@ -124,16 +124,48 @@ const Mappings = z.record(
     .regex(/^[A-Za-z0-9_./:^=-]+$/),
 );
 export class GlobalMarkets {
+  private twelveCache = new Map<string, { raw: unknown; until: number }>();
+  private nextTwelveRequest = 0;
+  constructor(
+    private upstoxQuotes?: (items: Instrument[]) => Promise<Quote[]>,
+  ) {}
+  async state() {
+    const base = await this.baseState();
+    if (!this.upstoxQuotes) return base;
+    let additional: Quote[] = [];
+    try {
+      additional = await this.upstoxQuotes(catalog);
+    } catch {
+      /* Base coverage remains explicitly unavailable. */
+    }
+    const quotes = base.quotes.map(
+      (q) => additional.find((a) => a.id === q.id) ?? q,
+    );
+    return {
+      ...base,
+      provider: "Upstox + Twelve Data",
+      configured: base.configured || additional.length > 0,
+      quotes,
+      regions: ["US", "Asia-Pacific", "Europe", "India"].map((group) =>
+        breadth(quotes, group),
+      ),
+      limitations: base.limitations
+        .filter((l) => !l.startsWith("GIFT Nifty requires"))
+        .concat(
+          "Upstox indices refresh on a 60-second cache with provider intervals shown per instrument. Older observations remain stale unless session closure is independently confirmed. No GIFT-to-spot opening gap is inferred.",
+        ),
+    };
+  }
   private cached?: Awaited<ReturnType<GlobalMarkets["fetchState"]>>;
   private until = 0;
   private pending?: Promise<Awaited<ReturnType<GlobalMarkets["fetchState"]>>>;
-  async state() {
+  private async baseState() {
     if (this.cached && Date.now() < this.until) return this.cached;
     if (this.pending) return this.pending;
     this.pending = this.fetchState()
       .then((value) => {
         this.cached = value;
-        this.until = Date.now() + 15 * 60000;
+        this.until = Date.now() + 60000;
         return value;
       })
       .finally(() => {
@@ -166,13 +198,31 @@ export class GlobalMarkets {
             ? "Provider symbol and entitlement need verification"
             : "Waiting for provider",
     }));
-    // Explicit opt-in mappings avoid silently spending quota across forty instruments.
+    // Cache per instrument and spread refreshes across provider-credit windows.
     if (key && !configError) {
       const symbols = [...new Set(Object.values(mappings))];
-      if (symbols.length)
+      const requestedLimit = Number(
+        process.env.TWELVE_DATA_CREDITS_PER_MINUTE ?? 8,
+      );
+      const limit =
+        Number.isInteger(requestedLimit) &&
+        requestedLimit > 0 &&
+        requestedLimit <= 100
+          ? requestedLimit
+          : 8;
+      const due = symbols.filter(
+        (symbol) =>
+          !this.twelveCache.has(symbol) ||
+          this.twelveCache.get(symbol)!.until <= Date.now(),
+      );
+      const batch =
+        Date.now() >= this.nextTwelveRequest ? due.slice(0, limit) : [];
+      let failed = false;
+      if (batch.length) {
+        this.nextTwelveRequest = Date.now() + 61000;
         try {
           const url = new URL("https://api.twelvedata.com/quote");
-          url.searchParams.set("symbol", symbols.join(","));
+          url.searchParams.set("symbol", batch.join(","));
           url.searchParams.set("apikey", key);
           const response = await fetch(url, {
             redirect: "error",
@@ -180,21 +230,38 @@ export class GlobalMarkets {
           });
           if (!response.ok) throw Error();
           const raw = JSON.parse(await boundedBody(response, 1_000_000));
-          for (let i = 0; i < quotes.length; i++) {
-            const symbol = mappings[quotes[i].id];
-            if (symbol)
-              quotes[i] = normalize(
-                catalog[i],
-                symbols.length === 1 ? raw : raw[symbol],
-                symbol,
-              );
+          for (const symbol of batch) {
+            const value = batch.length === 1 ? raw : raw[symbol];
+            if (ResponseSchema.safeParse(value).success)
+              this.twelveCache.set(symbol, {
+                raw: value,
+                until: Date.now() + 15 * 60000,
+              });
+            else failed = true;
           }
         } catch {
-          for (const row of quotes)
-            if (mappings[row.id])
-              row.reason =
-                "Provider unavailable, rate limited or access denied";
+          failed = true;
         }
+      }
+      for (let i = 0; i < quotes.length; i++) {
+        const symbol = mappings[quotes[i].id];
+        if (!symbol) continue;
+        const saved = this.twelveCache.get(symbol);
+        if (saved) {
+          quotes[i] = normalize(catalog[i], saved.raw, symbol);
+          if (saved.until <= Date.now())
+            quotes[i] = {
+              ...quotes[i],
+              state: "stale",
+              reason:
+                "Provider refresh pending or unavailable; retained previous observation",
+            };
+        } else
+          quotes[i].reason =
+            failed && batch.includes(symbol)
+              ? "Provider unavailable, rate limited or access denied"
+              : "Queued for the next provider credit window";
+      }
     }
     let news: ReturnType<typeof parseRss> = [];
     let newsStatus = "Unavailable";

@@ -169,7 +169,14 @@ export function chain(value: unknown, key: string, expiry: string) {
     putWall: [...rows].sort(
       (a, b) => b.put_options.market_data.oi - a.put_options.market_data.oi,
     )[0].strike_price,
-    maxPain: null,
+    totalOiChangePct: change(call + put, previousCall + previousPut),
+    pcrChange:
+      call > 0 && previousCall > 0
+        ? put / call - previousPut / previousCall
+        : null,
+    callVolume: sum("call_options", "volume"),
+    putVolume: sum("put_options", "volume"),
+    maxPain: null as number | null,
     maxPainNote:
       "Suppressed until chain completeness and OI units are verified.",
     rows: rows.map((r) => ({
@@ -179,5 +186,75 @@ export function chain(value: unknown, key: string, expiry: string) {
     })),
     limitation:
       "Chain response has no per-strike quote timestamp; retrieval time does not prove freshness. OI change alone does not prove writing. Volume units require provider verification.",
+  };
+}
+
+export function verifyChain(
+  result: ReturnType<typeof chain>,
+  value: unknown,
+  key: string,
+) {
+  const contracts = z
+    .object({
+      status: z.literal("success"),
+      data: z
+        .array(
+          z.object({
+            instrument_key: z.string(),
+            underlying_key: z.literal(key),
+            expiry: z.literal(result.expiry),
+            strike_price: z.number().positive(),
+            instrument_type: z.enum(["CE", "PE"]),
+            lot_size: z.number().positive(),
+          }),
+        )
+        .min(1),
+    })
+    .parse(value).data;
+  const actual = result.rows.flatMap((r) => [
+    { key: r.call.instrument_key, strike: r.strike, side: "CE" },
+    { key: r.put.instrument_key, strike: r.strike, side: "PE" },
+  ]);
+  const complete =
+    contracts.length === actual.length &&
+    new Set(contracts.map((c) => c.instrument_key)).size === contracts.length &&
+    new Set(actual.map((c) => c.key)).size === actual.length &&
+    contracts.every((c) =>
+      actual.some(
+        (a) =>
+          a.key === c.instrument_key &&
+          a.strike === c.strike_price &&
+          a.side === c.instrument_type,
+      ),
+    );
+  const uniformLots = new Set(contracts.map((c) => c.lot_size)).size === 1;
+  let maxPain: number | null = null;
+  const hasOi = result.callOi + result.putOi > 0;
+  if (complete && uniformLots && hasOi) {
+    const payouts = result.rows.map((candidate) => ({
+      strike: candidate.strike,
+      payout: result.rows.reduce(
+        (sum, r) =>
+          sum +
+          Math.max(0, candidate.strike - r.strike) * r.call.market_data.oi +
+          Math.max(0, r.strike - candidate.strike) * r.put.market_data.oi,
+        0,
+      ),
+    }));
+    const min = Math.min(...payouts.map((p) => p.payout));
+    const minima = payouts.filter((p) => p.payout === min);
+    if (minima.length === 1) maxPain = minima[0].strike;
+  }
+  return {
+    ...result,
+    completeness: complete
+      ? "Matches provider expiry contract list"
+      : "Incomplete or mismatched provider contract list",
+    expectedContracts: contracts.length,
+    maxPain,
+    maxPainNote:
+      maxPain === null
+        ? "Unavailable: incomplete chain, nonuniform lots, no OI or tied minima"
+        : "Minimum aggregate intrinsic payout across returned strikes with matching provider contracts and uniform lots. Not a price forecast; no freshness guarantee.",
   };
 }

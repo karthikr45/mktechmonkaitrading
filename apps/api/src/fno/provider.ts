@@ -60,7 +60,29 @@ export function universe(value: unknown, now = Date.now()): Stock[] {
   }
   return [...stocks.values()].sort((a, b) => a.symbol.localeCompare(b.symbol));
 }
+let cachedUniverse:
+  { value: Awaited<ReturnType<typeof fetchUniverse>>; at: number } | undefined;
+let pendingUniverse:
+  Promise<Awaited<ReturnType<typeof fetchUniverse>>> | undefined;
 export async function loadUniverse() {
+  if (
+    cachedUniverse &&
+    Date.now() - cachedUniverse.at < 15 * 60000 &&
+    Date.now() - Date.parse(cachedUniverse.value.publishedAt) < 96 * 3600000
+  )
+    return cachedUniverse.value;
+  if (!pendingUniverse)
+    pendingUniverse = fetchUniverse()
+      .then((value) => {
+        cachedUniverse = { value, at: Date.now() };
+        return value;
+      })
+      .finally(() => {
+        pendingUniverse = undefined;
+      });
+  return pendingUniverse;
+}
+async function fetchUniverse() {
   const response = await fetch(
     "https://assets.upstox.com/market-quote/instruments/exchange/NSE.json.gz",
     { redirect: "error", signal: AbortSignal.timeout(30000) },
@@ -113,6 +135,7 @@ export const Quotes = z.object({
       last_price: z.number().positive(),
       net_change: z.number(),
       timestamp: z.string(),
+      last_trade_time: z.coerce.number().int().positive().optional(),
       oi: z.number().nonnegative().optional(),
     }),
   ),

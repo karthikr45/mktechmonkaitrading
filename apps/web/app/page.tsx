@@ -6,8 +6,14 @@ import GlobalOutlook from "./GlobalOutlook";
 import NewsRiskPanel from "./NewsRiskPanel";
 import RealtimePanel from "./RealtimePanel";
 import LocalPanels from "./LocalPanels";
+import StockWorkspace from "./StockWorkspace";
 import DataStatus from "./DataStatus";
 const menus = [
+  [
+    "Stock workspace",
+    "Stock workspace",
+    "Select a stock once to review its price, futures OI, option chain and technical charts.",
+  ],
   [
     "Today",
     "Today",
@@ -36,7 +42,7 @@ const menus = [
   [
     "Global markets",
     "Global markets",
-    "Review international market context. Quotes are cached snapshots; timestamps and coverage identify what is available.",
+    "Review international market context. Upstox indices and Twelve Data stocks/FX use separate refresh schedules. Timestamps and coverage identify what is available.",
   ],
   [
     "Trade journal",
@@ -50,7 +56,7 @@ const menus = [
   ],
 ];
 export default function Page() {
-  const [tab, setTab] = useState("Today");
+  const [tab, setTab] = useState("Stock workspace");
   const [token, setToken] = useState("");
   const [error, setError] = useState("");
   const [light, setLight] = useState(false);
@@ -111,6 +117,7 @@ export default function Page() {
         )}
         {token && (
           <>
+            {tab === "Stock workspace" && <StockWorkspace token={token} />}
             {tab === "Today" && (
               <GlobalOutlook token={token} compact onNavigate={setTab} />
             )}

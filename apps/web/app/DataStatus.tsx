@@ -88,7 +88,8 @@ export default function DataStatus({ token }: { token: string }) {
           </p>
           <p>
             Global markets shows timestamps, freshness and unavailable coverage
-            for each instrument. These snapshots refresh on a 15-minute cache.
+            for each instrument. Upstox indices use a one-minute cache and
+            Twelve Data stocks a 15-minute cache.
           </p>
           <p>
             Historical backtests use available provider history and disclose

@@ -90,7 +90,7 @@ describe("Upstox V3 market transport", () => {
     socket.emit("open");
     expect(Buffer.isBuffer(socket.send.mock.calls[0][0])).toBe(true);
     expect(JSON.parse(socket.send.mock.calls[0][0].toString()).data).toEqual({
-      mode: "ltpc",
+      mode: "full",
       instrumentKeys: [key],
     });
     const tick = {
@@ -106,6 +106,55 @@ describe("Upstox V3 market transport", () => {
     feed.disconnect();
     expect(feed.status().quotes).toEqual([]);
     expect(feed.status().credentialsConfigured).toBe(false);
+  });
+  it("decodes full-feed OI and average price and emits an OI-only change", async () => {
+    const socket = new Socket();
+    const feed = new UpstoxFeed({
+      fetch: authorize,
+      socket: () => socket as unknown as WebSocket,
+    });
+    const listener = vi.fn();
+    feed.subscribe(listener);
+    feed.connect("test-token", [key]);
+    await vi.waitFor(() => expect(socket.listenerCount("message")).toBe(1));
+    socket.emit("open");
+    const ltt = String(Date.now());
+    const send = (oi: number) =>
+      socket.emit(
+        "message",
+        Buffer.from(
+          feedType
+            .encode(
+              feedType.fromObject({
+                feeds: {
+                  [key]: {
+                    fullFeed: {
+                      marketFF: {
+                        ltpc: { ltp: 100, ltt, cp: 99 },
+                        oi,
+                        atp: 99.5,
+                        vtt: "200",
+                      },
+                    },
+                  },
+                },
+              }),
+            )
+            .finish(),
+        ),
+        true,
+      );
+    send(100);
+    send(110);
+    expect(feed.status().quotes[0]).toMatchObject({
+      openInterest: 110,
+      averageTradedPrice: 99.5,
+      tradedVolume: 200,
+    });
+    expect(
+      listener.mock.calls.filter(([e]) => e.event === "tick"),
+    ).toHaveLength(2);
+    feed.disconnect();
   });
   it("stops retrying rejected credentials", async () => {
     const create = vi.fn();

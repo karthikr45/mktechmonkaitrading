@@ -1,7 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
+import PriceChart, { type ChartBar } from "./PriceChart";
 import { SSEParser } from "../lib/sse";
 type Quote = {
+  candles?: Omit<ChartBar, "ema20" | "ema50" | "rsi">[];
   openInterest?: number;
   averageTradedPrice?: number;
   tradedVolume?: number;
@@ -23,10 +25,15 @@ type Status = {
 export default function RealtimePanel({
   token,
   instrumentKeys,
+  instrumentNames = {},
 }: {
   token: string;
   instrumentKeys?: string[];
+  instrumentNames?: Record<string, string>;
 }) {
+  const [candleHistory, setCandleHistory] = useState<
+    Record<string, ChartBar[]>
+  >({});
   const [history, setHistory] = useState<Record<string, Quote[]>>({});
   const [status, setStatus] = useState<Status>();
   const [quotes, setQuotes] = useState<Record<string, Quote>>({});
@@ -38,6 +45,45 @@ export default function RealtimePanel({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [now, setNow] = useState(Date.now());
+  const selectedKeys = instrumentKeys?.join("\n") ?? "";
+  useEffect(() => {
+    if (!selectedKeys) return;
+    const controller = new AbortController();
+    setKeys(selectedKeys);
+    setQuotes({});
+    setHistory({});
+    setCandleHistory({});
+    setBusy(true);
+    setError("");
+    fetch("/api/brokers/upstox/connect", {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ instrumentKeys: selectedKeys.split("\n") }),
+    })
+      .then(async (r) => {
+        const body = await r.json();
+        if (!r.ok)
+          throw Error(body.message ?? "Selected stock subscription failed");
+        if (!controller.signal.aborted) setStatus(body);
+      })
+      .catch((e) => {
+        if (!controller.signal.aborted)
+          setError(e instanceof Error ? e.message : "Subscription unavailable");
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setBusy(false);
+      });
+    return () => controller.abort();
+  }, [selectedKeys, token]);
+  const requestedKeys = selectedKeys ? new Set(selectedKeys.split("\n")) : null;
+  const visibleQuotes = Object.values(quotes).filter(
+    (q) => !requestedKeys || requestedKeys.has(q.instrument),
+  );
+
   useEffect(() => {
     const controller = new AbortController();
     let retry: ReturnType<typeof setTimeout>;
@@ -91,6 +137,7 @@ export default function RealtimePanel({
               if (epoch !== next.epoch) {
                 epoch = next.epoch;
                 setHistory({});
+                setCandleHistory({});
               }
               setQuotes(
                 Object.fromEntries(next.quotes.map((q) => [q.instrument, q])),
@@ -137,6 +184,21 @@ export default function RealtimePanel({
       clearInterval(timer);
     };
   }, [token]);
+  useEffect(() => {
+    setCandleHistory((old) => {
+      const next = { ...old };
+      for (const q of Object.values(quotes)) {
+        if (!q.candles?.length) continue;
+        const bars = new Map((old[q.instrument] ?? []).map((b) => [b.time, b]));
+        for (const bar of q.candles)
+          bars.set(bar.time, { ...bar, ema20: null, ema50: null, rsi: null });
+        next[q.instrument] = [...bars.values()]
+          .sort((a, b) => a.time.localeCompare(b.time))
+          .slice(-120);
+      }
+      return next;
+    });
+  }, [quotes]);
   async function action(connect: boolean) {
     setBusy(true);
     setError("");
@@ -232,61 +294,93 @@ export default function RealtimePanel({
         </div>
       </details>
       {error && <p role="alert">{error}</p>}
-      {Object.entries(history).map(([instrument, series]) => {
-        if (series.length < 2)
+      {Object.entries(history)
+        .filter(
+          ([instrument]) => !requestedKeys || requestedKeys.has(instrument),
+        )
+        .map(([instrument, series]) => {
+          if (series.length < 2)
+            return (
+              <p key={instrument}>
+                {instrumentNames[instrument] ?? instrument}: waiting for a
+                second provider tick to draw the price graph.
+              </p>
+            );
+          const prices = series.map((q) => Number(q.price));
+          const lo = Math.min(...prices),
+            hi = Math.max(...prices);
+          const points = prices
+            .map(
+              (v, i) =>
+                `${20 + (i / (prices.length - 1)) * 760},${180 - ((v - lo) / (hi - lo || 1)) * 150}`,
+            )
+            .join(" ");
           return (
-            <p key={instrument}>
-              {instrument}: waiting for a second provider tick to draw the price
-              graph.
-            </p>
+            <figure key={instrument}>
+              <figcaption>
+                {instrumentNames[instrument] ?? instrument} · Received tick
+                prices · {series.length} observations
+              </figcaption>
+              <svg
+                viewBox="0 0 800 210"
+                role="img"
+                aria-label={`${instrument} received tick price chart`}
+                style={{ width: "100%", maxWidth: 900 }}
+              >
+                <polyline
+                  points={points}
+                  fill="none"
+                  stroke="#45d8b3"
+                  strokeWidth="2"
+                />
+                <text x="20" y="205" fill="currentColor">
+                  {lo.toFixed(2)} – {hi.toFixed(2)}
+                </text>
+              </svg>
+              <small>
+                {new Date(series[0].timestamp).toLocaleTimeString("en-IN", {
+                  timeZone: "Asia/Kolkata",
+                })}{" "}
+                –{" "}
+                {new Date(series.at(-1)!.timestamp).toLocaleTimeString(
+                  "en-IN",
+                  {
+                    timeZone: "Asia/Kolkata",
+                  },
+                )}{" "}
+                IST · Equal spacing per received tick, not time bars. History
+                starts when this view opens.
+              </small>
+            </figure>
           );
-        const prices = series.map((q) => Number(q.price));
-        const lo = Math.min(...prices),
-          hi = Math.max(...prices);
-        const points = prices
-          .map(
-            (v, i) =>
-              `${20 + (i / (prices.length - 1)) * 760},${180 - ((v - lo) / (hi - lo || 1)) * 150}`,
-          )
-          .join(" ");
-        return (
-          <figure key={instrument}>
-            <figcaption>
-              {instrument} · Received tick prices · {series.length} observations
-            </figcaption>
-            <svg
-              viewBox="0 0 800 210"
-              role="img"
-              aria-label={`${instrument} received tick price chart`}
-              style={{ width: "100%", maxWidth: 900 }}
-            >
-              <polyline
-                points={points}
-                fill="none"
-                stroke="#45d8b3"
-                strokeWidth="2"
-              />
-              <text x="20" y="205" fill="currentColor">
-                {lo.toFixed(2)} – {hi.toFixed(2)}
-              </text>
-            </svg>
-            <small>
-              {new Date(series[0].timestamp).toLocaleTimeString("en-IN", {
-                timeZone: "Asia/Kolkata",
-              })}{" "}
-              –{" "}
-              {new Date(series.at(-1)!.timestamp).toLocaleTimeString("en-IN", {
-                timeZone: "Asia/Kolkata",
-              })}{" "}
-              IST · Equal spacing per received tick, not time bars. History
-              starts when this view opens.
-            </small>
-          </figure>
-        );
-      })}
-      {!Object.keys(quotes).length ? (
+        })}
+      {Object.entries(candleHistory)
+        .filter(
+          ([instrument]) => !requestedKeys || requestedKeys.has(instrument),
+        )
+        .map(([instrument, bars]) => (
+          <div key={instrument}>
+            <p>
+              Source: Upstox WebSocket ·{" "}
+              {now - Date.parse(bars.at(-1)!.time) > 120000
+                ? "Older candle / closed or inactive session. "
+                : ""}
+              {status?.state === "connected"
+                ? "Connected; check candle times and market status"
+                : "Disconnected; retained candles are historical"}
+            </p>
+            <PriceChart
+              key={instrument}
+              streaming
+              symbol={instrumentNames[instrument] ?? instrument}
+              frames={[{ frame: "1m", chart: bars }]}
+            />
+          </div>
+        ))}
+      {!visibleQuotes.length ? (
         <p>
-          No Upstox quotes received. Connect with a valid token to subscribe.
+          No quotes received for the requested instruments. Check subscription
+          status and provider access.
         </p>
       ) : (
         <div style={{ overflowX: "auto" }}>
@@ -304,9 +398,9 @@ export default function RealtimePanel({
               </tr>
             </thead>
             <tbody>
-              {Object.values(quotes).map((q) => (
+              {visibleQuotes.map((q) => (
                 <tr key={q.instrument}>
-                  <td>{q.instrument}</td>
+                  <td>{instrumentNames[q.instrument] ?? q.instrument}</td>
                   <td>{q.price}</td>
                   <td>{q.previousClose ?? "—"}</td>
                   <td>{q.openInterest ?? "—"}</td>

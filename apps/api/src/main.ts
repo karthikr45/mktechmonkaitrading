@@ -88,6 +88,15 @@ async function validated<T>(fn: () => Promise<T>) {
 @ApiBearerAuth()
 @Controller("v1")
 class Api {
+  @Get("fno/plans") async tradePlans(@Req() req: Request) {
+    return validated(async () => fno.tradePlans(await tenant(req)));
+  }
+  @Post("fno/plans") async saveTradePlan(
+    @Req() req: Request,
+    @Body() body: unknown,
+  ) {
+    return validated(async () => fno.saveTradePlan(await tenant(req), body));
+  }
   @Get("fno/symbols") async fnoSymbols(@Req() req: Request) {
     return validated(async () => {
       await tenant(req);

@@ -49,6 +49,7 @@ export type Quote = Instrument & {
   session?: string;
   reason?: string;
   currency?: string;
+  source?: "Upstox" | "Twelve Data";
 };
 const ResponseSchema = z.object({
   symbol: z.string(),
@@ -83,6 +84,7 @@ export function normalize(
   return {
     ...item,
     state: stale ? "stale" : "available",
+    source: "Twelve Data",
     price: q.close,
     changePct: (q.close / q.previous_close - 1) * 100,
     asOf: new Date(q.timestamp * 1000).toISOString(),
@@ -282,6 +284,9 @@ export class GlobalMarkets {
             Date.now() - Date.parse(a.publishedAt) >= 0 &&
             Date.now() - Date.parse(a.publishedAt) < 72 * 3600000,
         )
+        .filter(
+          (a, index, all) => all.findIndex((b) => b.url === a.url) === index,
+        )
         .sort((a, b) => Date.parse(b.publishedAt!) - Date.parse(a.publishedAt!))
         .slice(0, 8);
       newsStatus = news.length
@@ -292,8 +297,8 @@ export class GlobalMarkets {
     }
     return {
       checkedAt: new Date().toISOString(),
-      provider: "Twelve Data",
-      configured: !!key,
+      provider: "Per-instrument source",
+      configured: !!key || quotes.some((quote) => quote.source === "Upstox"),
       quotes,
       regions: ["US", "Asia-Pacific", "Europe", "India"].map((group) =>
         breadth(quotes, group),

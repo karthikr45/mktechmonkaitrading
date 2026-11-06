@@ -1,3 +1,5 @@
+import { financialStatements } from "./financials";
+import { evaluateTradePlan } from "./trade-plan";
 import { randomUUID } from "node:crypto";
 import { BadRequestException } from "@nestjs/common";
 import { LocalStore } from "../persistence";
@@ -26,6 +28,44 @@ export class FnoService {
     private request: (tenant: string, path: string) => Promise<unknown>,
     private master = loadUniverse,
   ) {}
+  async tradePlans(t: string) {
+    return this.store.scoped(t, (m) =>
+      m.query(
+        "SELECT id,result,created_at FROM research_runs WHERE kind='trade-plan' ORDER BY created_at DESC LIMIT 100",
+      ),
+    );
+  }
+  async saveTradePlan(t: string, body: unknown) {
+    const plan = evaluateTradePlan(body);
+    const snapshot = await this.stockSnapshot(t, plan.input.symbol);
+    const result = {
+      ...plan,
+      state: "plan_only",
+      source: {
+        provider: "Upstox",
+        instrument: snapshot.stock.key,
+        symbol: snapshot.stock.symbol,
+        retrievedAt: snapshot.retrievedAt,
+        quoteFreshness: snapshot.quoteFreshness,
+        spot: snapshot.spot,
+        futuresOiChangePct: snapshot.futuresOiChangePct,
+        optionOiChangePct: snapshot.optionChain?.totalOiChangePct ?? null,
+        failures: snapshot.failures,
+      },
+    };
+    const id = randomUUID();
+    await this.store.scoped(t, async (m) => {
+      await m.query(
+        "INSERT INTO research_runs(tenant_id,id,kind,request,result) VALUES($1,$2,'trade-plan',$3,$4)",
+        [t, id, JSON.stringify(plan.input), JSON.stringify(result)],
+      );
+      await this.store.record(m, t, "trade-plan.saved", {
+        id,
+        symbol: snapshot.stock.symbol,
+      });
+    });
+    return { id, result };
+  }
   async symbols() {
     const master = await this.master();
     return { stocks: master.stocks, publishedAt: master.publishedAt };
@@ -171,6 +211,10 @@ export class FnoService {
         fundamentalsResult.status === "fulfilled"
           ? fundamentalsResult.value.data
           : [];
+      const financials = await financialStatements(
+        (path) => this.request(t, path),
+        key.split("|")[1],
+      );
       const id = randomUUID();
       const evidence = [
         {
@@ -198,6 +242,23 @@ export class FnoService {
           instruments: [key],
           url: "https://upstox.com/developer/api-documentation/",
         },
+        ...financials.sections
+          .filter((s) => s.state === "available")
+          .map((s) => ({
+            id: `financial:${id}:${s.id}`,
+            title: `${snapshot.stock.symbol} ${s.name}`,
+            summary: JSON.stringify({
+              basis: financials.basis,
+              units: financials.units,
+              frequency: s.frequency,
+              rows: s.rows,
+              limitation: financials.limitation,
+            }),
+            publishedAt: null,
+            source: financials.source,
+            instruments: [key],
+            url: "https://upstox.com/developer/api-documentation/announcements/company-fundamentals-api/",
+          })),
         ...news,
       ];
       const coverage = [
@@ -205,12 +266,16 @@ export class FnoService {
         news.length
           ? `${news.length} recent stock articles; coverage may be incomplete`
           : "No recent stock news was returned; do not infer that no event exists",
+        financials.limitation,
+        ...financials.sections
+          .filter((s) => s.state === "unavailable")
+          .map((s) => `${s.name}: unavailable`),
         "Fundamental ratios have no verified reporting period and are shown separately; do not treat retrieval time as financial-statement recency.",
       ];
       const ai = await analyze(
         evidence,
         coverage,
-        `Explain the supplied ${snapshot.stock.symbol} evidence for a trader: distinguish cash price, futures price/OI and option-chain OI; discuss only supplied news, freshness and missing confirmations. Do not infer buying/writing from OI alone. Do not recommend a trade, invent a target, claim a success probability or infer broader market direction. Cite evidence IDs for every finding.`,
+        `Explain the supplied ${snapshot.stock.symbol} evidence for a trader: distinguish cash price, futures price/OI and option-chain OI; discuss supplied financial periods, revenue/profit/cash flow, news, freshness and missing confirmations. Financial periods are not publication dates; do not call the latest returned quarter the latest filed result. Do not infer buying/writing from OI alone. Do not recommend a trade, invent a target, claim a success probability or infer broader market direction. Cite evidence IDs for every finding.`,
       );
       const result = {
         symbol: snapshot.stock.symbol,
@@ -218,6 +283,7 @@ export class FnoService {
         ai,
         news,
         fundamentals,
+        financials,
         coverage,
       };
       await this.store.scoped(t, (m) =>

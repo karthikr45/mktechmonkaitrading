@@ -14,11 +14,13 @@ export type ChartBar = {
 export default function PriceChart({
   frames,
   symbol,
+  streaming = false,
 }: {
   frames: { frame: string; chart?: ChartBar[] }[];
   symbol: string;
+  streaming?: boolean;
 }) {
-  const [frame, setFrame] = useState("5m"),
+  const [frame, setFrame] = useState(frames[0]?.frame ?? "5m"),
     [hover, setHover] = useState<number>();
   const bars = frames.find((f) => f.frame === frame)?.chart ?? [];
   const selected = bars[hover ?? bars.length - 1];
@@ -54,7 +56,12 @@ export default function PriceChart({
     });
   return (
     <section aria-label={`${symbol} price chart`}>
-      <h3>{symbol} · Candlesticks, EMA, volume and RSI</h3>
+      <h3>
+        {symbol} ·{" "}
+        {streaming
+          ? "Streaming provider candles and volume"
+          : "Candlesticks, EMA, volume and RSI"}
+      </h3>
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         {frames.map((f) => (
           <button
@@ -70,8 +77,9 @@ export default function PriceChart({
         ))}
       </div>
       <p>
-        Completed provider candles · snapshot, not a live tick chart. Hover or
-        focus a candle for its values. EMA20: yellow · EMA50: blue.
+        {streaming
+          ? "Provider one-minute candles received over the live feed. The current interval may change. Only received bars are shown; missed intervals are not filled. Indicators require the separate historical analysis."
+          : "Completed provider candles · snapshot, not a live tick chart. Hover or focus a candle for its values. EMA20: yellow · EMA50: blue."}
       </p>
       {!bars.length ? (
         <p>No verified candles for this timeframe.</p>
@@ -79,11 +87,11 @@ export default function PriceChart({
         <>
           <p aria-live="polite">
             {selected &&
-              `${stamp(selected.time)} IST · O ${selected.open.toFixed(2)} · H ${selected.high.toFixed(2)} · L ${selected.low.toFixed(2)} · C ${selected.close.toFixed(2)} · Volume ${selected.volume.toLocaleString("en-IN")} · RSI ${selected.rsi?.toFixed(2) ?? "Unavailable"}`}
+              `${stamp(selected.time)} IST · O ${selected.open.toFixed(2)} · H ${selected.high.toFixed(2)} · L ${selected.low.toFixed(2)} · C ${selected.close.toFixed(2)} · Volume ${selected.volume.toLocaleString("en-IN")}${streaming ? "" : ` · RSI ${selected.rsi?.toFixed(2) ?? "Unavailable"}`}`}
           </p>
           <div style={{ overflowX: "auto" }}>
             <svg
-              viewBox="0 0 960 560"
+              viewBox={streaming ? "0 0 960 460" : "0 0 960 560"}
               style={{
                 width: "100%",
                 minWidth: 640,
@@ -91,7 +99,7 @@ export default function PriceChart({
                 borderRadius: 8,
               }}
               role="img"
-              aria-label={`${symbol} ${frame} candlesticks with EMA20, EMA50, volume and RSI. ${bars.length} completed candles.`}
+              aria-label={`${symbol} ${frame} ${streaming ? "provider candlesticks and volume" : "candlesticks with EMA20, EMA50, volume and RSI"}. ${bars.length} ${streaming ? "received provider" : "completed"} candles.`}
             >
               {[0, 1, 2, 3, 4].map((i) => {
                 const value = max - ((max - min) * i) / 4;
@@ -175,49 +183,57 @@ export default function PriceChart({
               <text x="8" y="370" fill="currentColor" fontSize="11">
                 VOL
               </text>
-              <text x="8" y="460" fill="currentColor" fontSize="11">
-                RSI14
-              </text>
-              {[30, 50, 70].map((v) => (
-                <g key={v}>
-                  <line
-                    x1="60"
-                    x2="880"
-                    y1={525 - v * 0.85}
-                    y2={525 - v * 0.85}
-                    stroke="var(--line)"
-                    strokeDasharray="4 4"
+              {!streaming && (
+                <>
+                  <text x="8" y="460" fill="currentColor" fontSize="11">
+                    RSI14
+                  </text>
+                  {[30, 50, 70].map((v) => (
+                    <g key={v}>
+                      <line
+                        x1="60"
+                        x2="880"
+                        y1={525 - v * 0.85}
+                        y2={525 - v * 0.85}
+                        stroke="var(--line)"
+                        strokeDasharray="4 4"
+                      />
+                      <text
+                        x="886"
+                        y={529 - v * 0.85}
+                        fill="currentColor"
+                        fontSize="11"
+                      >
+                        {v}
+                      </text>
+                    </g>
+                  ))}
+                  <polyline
+                    points={line("rsi", (v) => 525 - v * 0.85)}
+                    fill="none"
+                    stroke="#c5a1ff"
+                    strokeWidth="1.5"
                   />
-                  <text
-                    x="886"
-                    y={529 - v * 0.85}
-                    fill="currentColor"
-                    fontSize="11"
-                  >
-                    {v}
-                  </text>
-                </g>
-              ))}
-              <polyline
-                points={line("rsi", (v) => 525 - v * 0.85)}
-                fill="none"
-                stroke="#c5a1ff"
-                strokeWidth="1.5"
-              />
-              {[0, Math.floor((bars.length - 1) / 2), bars.length - 1].map(
-                (i, j) => (
-                  <text
-                    key={j}
-                    x={x(i)}
-                    y="548"
-                    textAnchor={j === 0 ? "start" : j === 2 ? "end" : "middle"}
-                    fill="currentColor"
-                    fontSize="10"
-                  >
-                    {stamp(bars[i].time)}
-                  </text>
-                ),
+                </>
               )}
+              {[
+                ...new Set([
+                  0,
+                  Math.floor((bars.length - 1) / 2),
+                  bars.length - 1,
+                ]),
+              ].map((i, j) => (
+                <text
+                  key={j}
+                  x={x(i)}
+                  y={streaming ? 448 : 548}
+                  textAnchor={j === 0 ? "start" : j === 2 ? "end" : "middle"}
+                  fill="currentColor"
+                  fontSize="10"
+                >
+                  {stamp(bars[i].time)}
+                </text>
+              ))}
             </svg>
           </div>
         </>

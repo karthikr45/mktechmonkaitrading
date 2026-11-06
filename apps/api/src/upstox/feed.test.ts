@@ -6,6 +6,7 @@ import {
   decodeFeed,
   feedType,
   normalizeQuote,
+  minuteCandles,
   UpstoxFeed,
 } from "./feed";
 class Socket extends EventEmitter {
@@ -119,7 +120,7 @@ describe("Upstox V3 market transport", () => {
     await vi.waitFor(() => expect(socket.listenerCount("message")).toBe(1));
     socket.emit("open");
     const ltt = String(Date.now());
-    const send = (oi: number) =>
+    const send = (oi: number, candleClose = 100) =>
       socket.emit(
         "message",
         Buffer.from(
@@ -134,6 +135,19 @@ describe("Upstox V3 market transport", () => {
                         oi,
                         atp: 99.5,
                         vtt: "200",
+                        marketOHLC: {
+                          ohlc: [
+                            {
+                              interval: "I1",
+                              ts: String(Number(ltt) - 60000),
+                              open: 99,
+                              high: 102,
+                              low: 98,
+                              close: candleClose,
+                              vol: "50",
+                            },
+                          ],
+                        },
                       },
                     },
                   },
@@ -146,6 +160,7 @@ describe("Upstox V3 market transport", () => {
       );
     send(100);
     send(110);
+    send(110, 101);
     expect(feed.status().quotes[0]).toMatchObject({
       openInterest: 110,
       averageTradedPrice: 99.5,
@@ -153,7 +168,8 @@ describe("Upstox V3 market transport", () => {
     });
     expect(
       listener.mock.calls.filter(([e]) => e.event === "tick"),
-    ).toHaveLength(2);
+    ).toHaveLength(3);
+    expect(feed.status().quotes[0].candles?.[0].close).toBe(101);
     feed.disconnect();
   });
   it("stops retrying rejected credentials", async () => {
@@ -207,4 +223,35 @@ describe("Upstox V3 market transport", () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(create).not.toHaveBeenCalled();
   });
+});
+
+it("validates actual provider minute candles without manufacturing missing prices or volume", () => {
+  const now = Date.now(),
+    base = {
+      interval: "I1",
+      ts: String(now - 60000),
+      open: 100,
+      high: 105,
+      low: 99,
+      close: 102,
+      vol: "123",
+    };
+  expect(minuteCandles([base], now)[0]).toMatchObject({
+    open: 100,
+    high: 105,
+    low: 99,
+    close: 102,
+    volume: 123,
+  });
+  expect(
+    minuteCandles(
+      [
+        { ...base, interval: "1d" },
+        { ...base, high: 98 },
+        { ...base, vol: undefined },
+        { ...base, ts: String(now + 60000) },
+      ],
+      now,
+    ),
+  ).toEqual([]);
 });

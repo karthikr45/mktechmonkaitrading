@@ -5,19 +5,17 @@ export function chartSeries(rows: Candle[]) {
   const e20 = emaSeries(closes, 20),
     e50 = emaSeries(closes, 50);
   const start = Math.max(0, rows.length - 120);
-  return rows
-    .slice(start)
-    .map((r, i) => ({
-      time: r[0],
-      open: r[1],
-      high: r[2],
-      low: r[3],
-      close: r[4],
-      volume: r[5],
-      ema20: e20[start + i],
-      ema50: e50[start + i],
-      rsi: rsi(closes.slice(0, start + i + 1)),
-    }));
+  return rows.slice(start).map((r, i) => ({
+    time: r[0],
+    open: r[1],
+    high: r[2],
+    low: r[3],
+    close: r[4],
+    volume: r[5],
+    ema20: e20[start + i],
+    ema50: e50[start + i],
+    rsi: rsi(closes.slice(0, start + i + 1)),
+  }));
 }
 
 function emaSeries(values: number[], period: number) {
@@ -31,6 +29,19 @@ function emaSeries(values: number[], period: number) {
   }
   return result;
 }
+// Compare two completed observations; an ongoing trend is not a new crossover.
+export function crossover(previous: number | null, current: number | null) {
+  if (
+    previous === null ||
+    current === null ||
+    !Number.isFinite(previous) ||
+    !Number.isFinite(current)
+  )
+    return "Insufficient history";
+  if (previous <= 0 && current > 0) return "Bullish crossover";
+  if (previous >= 0 && current < 0) return "Bearish crossover";
+  return "No new crossover";
+}
 export function indicators(rows: Candle[]) {
   const basic = technical(rows),
     close = rows.map((r) => r[4]),
@@ -40,7 +51,29 @@ export function indicators(rows: Candle[]) {
   const macd = close.flatMap((_, i) =>
     fast[i] !== null && slow[i] !== null ? [fast[i]! - slow[i]!] : [],
   );
-  const signal = emaSeries(macd, 9).at(-1) ?? null;
+  const signalSeries = emaSeries(macd, 9);
+  const signal = signalSeries.at(-1) ?? null;
+  const previousSignal = signalSeries.at(-2) ?? null;
+  const ma50 = emaSeries(close, 50),
+    ma200 = emaSeries(close, 200);
+  const difference = (
+    a: number | null | undefined,
+    b: number | null | undefined,
+  ) => (a == null || b == null ? null : a - b);
+  const alignmentValues = [10, 20, 50, 100, 200].map(
+    (period) => emaSeries(close, period).at(-1) ?? null,
+  );
+  const emaAlignment = alignmentValues.some((value) => value === null)
+    ? "Insufficient history"
+    : alignmentValues.every(
+          (value, i) => i === 0 || alignmentValues[i - 1]! > value!,
+        )
+      ? "Bullish alignment"
+      : alignmentValues.every(
+            (value, i) => i === 0 || alignmentValues[i - 1]! < value!,
+          )
+        ? "Bearish alignment"
+        : "Mixed / flat alignment";
   let tr = 0,
     plus = 0,
     minus = 0,
@@ -90,6 +123,15 @@ export function indicators(rows: Candle[]) {
     range = last ? last[2] - last[3] : 0;
   return {
     ...basic,
+    emaAlignment,
+    ema50x200: crossover(
+      difference(ma50.at(-2), ma200.at(-2)),
+      difference(ma50.at(-1), ma200.at(-1)),
+    ),
+    macdCrossover: crossover(
+      difference(macd.at(-2), previousSignal),
+      difference(macd.at(-1), signal),
+    ),
     close: last?.[4] ?? null,
     atr14: atr,
     adx14: adx,

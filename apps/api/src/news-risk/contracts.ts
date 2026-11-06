@@ -152,7 +152,12 @@ export function projectRisk(input: unknown) {
     slippage = new Decimal(p.adverseSlippage);
   const perUnit = entry.minus(stop).abs().plus(slippage);
   const loss = perUnit.mul(p.quantity).plus(costs);
-  const reward = target.minus(entry).abs().mul(p.quantity).minus(costs);
+  const reward = target
+    .minus(entry)
+    .abs()
+    .minus(slippage)
+    .mul(p.quantity)
+    .minus(costs);
   const size = Decimal.max(0, new Decimal(p.riskBudget).minus(costs))
     .div(perUnit)
     .floor();

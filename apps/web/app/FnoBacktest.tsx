@@ -27,9 +27,15 @@ type Study = {
     assumptions: string[];
   };
 };
-export default function FnoBacktest({ token }: { token: string }) {
+export default function FnoBacktest({
+  token,
+  initialSymbol = "",
+}: {
+  token: string;
+  initialSymbol?: string;
+}) {
   const [form, setForm] = useState({
-    symbol: "",
+    symbol: initialSymbol,
     priceMove: 1.8,
     oiChange: 10,
     holdBars: 1,

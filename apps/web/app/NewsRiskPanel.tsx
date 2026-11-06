@@ -179,6 +179,11 @@ export default function NewsRiskPanel({ token }: { token: string }) {
   const alerts = data.alerts.filter(
     (a) => showAll || (!a.acknowledged_at && !a.resolved_at),
   );
+  const visibleAlerts = showAll
+    ? alerts
+    : [...alerts]
+        .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))
+        .slice(0, 5);
   const briefing = selectedBriefing ?? data.latest;
   const report = briefing?.report;
   return (
@@ -336,7 +341,7 @@ export default function NewsRiskPanel({ token }: { token: string }) {
             checked={showAll}
             onChange={(e) => setShowAll(e.target.checked)}
           />{" "}
-          Include acknowledged / resolved alerts
+          Show all alerts, including older, acknowledged and resolved
         </label>
         {!alerts.length && (
           <p>
@@ -344,7 +349,13 @@ export default function NewsRiskPanel({ token }: { token: string }) {
             market all-clear.
           </p>
         )}
-        {alerts.map((a) => (
+        <p>
+          {alerts.length} {showAll ? "stored" : "outstanding"} alerts.{" "}
+          {showAll
+            ? ""
+            : "Showing the five most recent; open all alerts to review older warnings."}
+        </p>
+        {visibleAlerts.map((a) => (
           <article className="researchCard" key={a.id}>
             <strong>
               {a.severity.toUpperCase()} · {a.title}

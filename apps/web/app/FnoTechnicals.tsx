@@ -11,6 +11,9 @@ type Frame = {
   asOf?: string;
   rsi?: number | null;
   rsiBand?: string;
+  emaAlignment?: string;
+  ema50x200?: string;
+  macdCrossover?: string;
   adx14?: number | null;
   atr14?: number | null;
   macd?: number | null;
@@ -183,6 +186,36 @@ export default function FnoTechnicals({
                     <td>{n(f.volumeVsPrevious20)}</td>
                   </tr>
                 ))}
+              </tbody>
+            </table>
+          </div>
+          <h3>Trend confirmations from completed candles</h3>
+          <p>
+            Crossovers compare the last two completed candles. They are
+            observations, not entry recommendations; liquidity, news and market
+            context still need confirmation.
+          </p>
+          <div className="marketTable">
+            <table>
+              <thead>
+                <tr>
+                  <th>Frame</th>
+                  <th>EMA 10/20/50/100/200</th>
+                  <th>EMA 50 / 200 cross</th>
+                  <th>MACD / signal cross</th>
+                </tr>
+              </thead>
+              <tbody>
+                {report.frames
+                  .filter((f) => f.status === "available")
+                  .map((f) => (
+                    <tr key={f.frame}>
+                      <td>{f.frame}</td>
+                      <td>{f.emaAlignment ?? "Unavailable"}</td>
+                      <td>{f.ema50x200 ?? "Unavailable"}</td>
+                      <td>{f.macdCrossover ?? "Unavailable"}</td>
+                    </tr>
+                  ))}
               </tbody>
             </table>
           </div>

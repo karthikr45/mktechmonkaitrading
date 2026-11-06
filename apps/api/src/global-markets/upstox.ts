@@ -50,6 +50,7 @@ export function upstoxGlobalQuote(
     };
   return {
     ...item,
+    source: "Upstox",
     price: q.last_price,
     changePct: (100 * q.net_change) / prior,
     asOf: new Date(q.last_trade_time).toISOString(),
@@ -100,15 +101,13 @@ export class UpstoxGlobal {
       } finally {
         await reader.cancel();
       }
-      const rows = z
-        .array(GlobalRow)
-        .parse(
-          JSON.parse(
-            gunzipSync(Buffer.concat(parts), {
-              maxOutputLength: 2000000,
-            }).toString(),
-          ),
-        );
+      const rows = z.array(GlobalRow).parse(
+        JSON.parse(
+          gunzipSync(Buffer.concat(parts), {
+            maxOutputLength: 2000000,
+          }).toString(),
+        ),
+      );
       this.master = { rows, until: Date.now() + 15 * 60000 };
     }
     const mapped = this.master.rows.filter((r) => identities[r.name]);

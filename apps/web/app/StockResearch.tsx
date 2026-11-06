@@ -1,6 +1,24 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
+type Financials = {
+  source: string;
+  basis: string;
+  units: string;
+  retrievedAt: string;
+  limitation: string;
+  sections: {
+    id: string;
+    name: string;
+    state: string;
+    reason?: string;
+    rows: {
+      name: string;
+      history: { period: string; value: number; change?: string }[];
+    }[];
+  }[];
+};
 type Report = {
+  financials?: Financials;
   retrievedAt: string;
   ai: {
     state: string;
@@ -62,8 +80,9 @@ export default function StockResearch({
     <section className="panel">
       <h2>{symbol} · news, fundamentals & local AI</h2>
       <p>
-        Fetch recent provider news and current ratios. Ollama explains the
-        timestamped evidence; it cannot supply missing market facts.
+        Fetch provider news, dated financial statements and available ratios.
+        Ollama explains the timestamped evidence; it cannot supply missing
+        market facts.
       </p>
       <button disabled={busy} onClick={() => void run()}>
         {busy
@@ -86,7 +105,30 @@ export default function StockResearch({
                   <p>{f.whyItMatters}</p>
                   <p>Review: {f.review}</p>
                   <p>Uncertainty: {f.uncertainty}</p>
-                  <small>Evidence: {f.evidenceIds.join(", ")}</small>
+                  <div aria-label="Supporting evidence">
+                    {f.evidenceIds.map((id) => {
+                      const article = report.news.find((n) => n.id === id);
+                      return article ? (
+                        <p key={id}>
+                          <a
+                            href={article.url}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {article.title}
+                          </a>
+                        </p>
+                      ) : (
+                        <p key={id}>
+                          {id.startsWith("stock:")
+                            ? `${symbol} price and derivatives snapshot`
+                            : id.startsWith("financial:")
+                              ? "Provider financial statement below; check its reporting period"
+                              : "Source reference unavailable"}
+                        </p>
+                      );
+                    })}
+                  </div>
                 </article>
               ))}
             </>
@@ -106,6 +148,69 @@ export default function StockResearch({
               <p>{n.publishedAt} · Upstox News</p>
             </article>
           ))}
+          {report.financials && (
+            <section>
+              <h3>Financial history and latest returned quarters</h3>
+              <p>
+                {report.financials.source} · {report.financials.basis} · All
+                values in {report.financials.units}
+              </p>
+              <p>{report.financials.limitation}</p>
+              {report.financials.sections.map((section) => {
+                const periods = [
+                  ...new Set(
+                    section.rows.flatMap((row) =>
+                      row.history.map((h) => h.period),
+                    ),
+                  ),
+                ].sort((a, b) => Date.parse(`1 ${b}`) - Date.parse(`1 ${a}`));
+                return (
+                  <details key={section.id} open>
+                    <summary>
+                      {section.name} · {section.state} · {periods.length}{" "}
+                      periods
+                    </summary>
+                    {section.reason && <p>{section.reason}</p>}
+                    {!!periods.length && (
+                      <div className="marketTable">
+                        <table>
+                          <thead>
+                            <tr>
+                              <th>Measure (₹ crore)</th>
+                              {periods.map((p) => (
+                                <th key={p}>{p}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {section.rows.map((row) => (
+                              <tr key={row.name}>
+                                <th>{row.name}</th>
+                                {periods.map((p) => {
+                                  const value = row.history.find(
+                                    (h) => h.period === p,
+                                  )?.value;
+                                  return (
+                                    <td key={p}>
+                                      {value === undefined
+                                        ? "Unavailable"
+                                        : value.toLocaleString("en-IN", {
+                                            maximumFractionDigits: 2,
+                                          })}
+                                    </td>
+                                  );
+                                })}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </details>
+                );
+              })}
+            </section>
+          )}
           <h3>Company / sector ratios</h3>
           <p>
             Source reporting periods are not provided. These ratios cannot

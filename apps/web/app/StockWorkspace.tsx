@@ -54,12 +54,20 @@ const number = (n?: number | null) =>
     : n.toLocaleString("en-IN", { maximumFractionDigits: 2 });
 const percent = (n?: number | null) =>
   n == null ? "Unavailable" : `${n.toFixed(2)}%`;
-export default function StockWorkspace({ token }: { token: string }) {
+export default function StockWorkspace({
+  token,
+  initialSymbol = "",
+  onSelect,
+}: {
+  token: string;
+  initialSymbol?: string;
+  onSelect?: (stock: Stock) => void;
+}) {
   const [watchMessage, setWatchMessage] = useState("");
   const [watchBusy, setWatchBusy] = useState(false);
   const [stocks, setStocks] = useState<Stock[]>([]);
-  const [input, setInput] = useState("");
-  const [symbol, setSymbol] = useState("");
+  const [input, setInput] = useState(initialSymbol);
+  const [symbol, setSymbol] = useState(initialSymbol);
   const [data, setData] = useState<Snapshot>();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -170,6 +178,7 @@ export default function StockWorkspace({ token }: { token: string }) {
               setData(undefined);
               setWatchMessage("");
             }
+            onSelect?.(stocks.find((s) => s.symbol.toUpperCase() === next)!);
             setSymbol(next);
             setRevision((r) => r + 1);
           }}
@@ -256,6 +265,10 @@ export default function StockWorkspace({ token }: { token: string }) {
             key={symbol}
             token={token}
             instrumentKeys={[data.stock.key, data.stock.future]}
+            instrumentNames={{
+              [data.stock.key]: `${symbol} · Cash`,
+              [data.stock.future]: `${symbol} · Futures ${data.stock.expiry}`,
+            }}
           />
           <section className="panel">
             <h2>Option chain · {data.stock.expiry}</h2>

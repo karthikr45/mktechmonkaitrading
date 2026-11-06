@@ -43,3 +43,15 @@ it("accepts a recent closed session without claiming it is live", () => {
   );
   expect(e.title).toContain("Closed");
 });
+
+it("preserves mixed-provider attribution and never invents a provider", () => {
+  const evidence = marketEvidence(
+    [{ ...row, source: "Upstox" }, { ...row, source: "Twelve Data" }, row],
+    now,
+  );
+  expect(evidence[0].source).toBe("Upstox quote snapshot");
+  expect(evidence[0].url).toContain("upstox.com");
+  expect(evidence[1].source).toBe("Twelve Data quote snapshot");
+  expect(evidence[2].source).toBe("Unverified provider quote snapshot");
+  expect(evidence[2].url).toBe("");
+});

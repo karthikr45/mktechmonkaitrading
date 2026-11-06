@@ -45,6 +45,7 @@ describe("News and risk rules", () => {
     };
     const r = projectRisk(p);
     expect(r.estimatedStopLoss).toBe("570.00");
+    expect(r.estimatedNetReward).toBe("930.00");
     expect(r.maximumQuantityByRisk).toBe("87");
     expect(r.exceedsBudget).toBe(true);
     expect(

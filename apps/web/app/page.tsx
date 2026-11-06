@@ -5,7 +5,7 @@ import FnoTechnicals from "./FnoTechnicals";
 import GlobalOutlook from "./GlobalOutlook";
 import NewsRiskPanel from "./NewsRiskPanel";
 import RealtimePanel from "./RealtimePanel";
-import LocalPanels from "./LocalPanels";
+import TradeJournal from "./TradeJournal";
 import StockWorkspace from "./StockWorkspace";
 import DataStatus from "./DataStatus";
 const menus = [
@@ -58,6 +58,11 @@ const menus = [
 export default function Page() {
   const [tab, setTab] = useState("Stock workspace");
   const [token, setToken] = useState("");
+  const [selectedStock, setSelectedStock] = useState<{
+    symbol: string;
+    key: string;
+    future: string;
+  } | null>(null);
   const [error, setError] = useState("");
   const [light, setLight] = useState(false);
   useEffect(() => {
@@ -110,6 +115,14 @@ export default function Page() {
           </button>
         </header>
         <h1>{menu[1]}</h1>
+        {selectedStock && (
+          <p className="stockContext">
+            Selected stock: <strong>{selectedStock.symbol}</strong> ·{" "}
+            <button onClick={() => setTab("Stock workspace")}>
+              Open stock workspace
+            </button>
+          </p>
+        )}
         <p className="muted">{menu[2]}</p>
         {error && <p role="alert">{error}</p>}
         {!token && !error && (
@@ -117,19 +130,52 @@ export default function Page() {
         )}
         {token && (
           <>
-            {tab === "Stock workspace" && <StockWorkspace token={token} />}
+            {tab === "Stock workspace" && (
+              <StockWorkspace
+                token={token}
+                initialSymbol={selectedStock?.symbol}
+                onSelect={setSelectedStock}
+              />
+            )}
             {tab === "Today" && (
               <GlobalOutlook token={token} compact onNavigate={setTab} />
             )}
             {tab === "Global markets" && (
               <GlobalOutlook token={token} onNavigate={setTab} />
             )}
-            {tab === "Market charts" && <FnoTechnicals token={token} />}
-            {tab === "Real-time market" && <RealtimePanel token={token} />}
-            {tab === "F&O scanner" && <FnoPanel token={token} />}
+            {tab === "Market charts" && (
+              <FnoTechnicals
+                token={token}
+                initialSymbol={selectedStock?.symbol}
+              />
+            )}
+            {tab === "Real-time market" && (
+              <RealtimePanel
+                token={token}
+                instrumentNames={
+                  selectedStock
+                    ? {
+                        [selectedStock.key]: `${selectedStock.symbol} · Cash`,
+                        [selectedStock.future]: `${selectedStock.symbol} · Futures`,
+                      }
+                    : undefined
+                }
+                instrumentKeys={
+                  selectedStock
+                    ? [selectedStock.key, selectedStock.future]
+                    : undefined
+                }
+              />
+            )}
+            {tab === "F&O scanner" && (
+              <FnoPanel token={token} initialSymbol={selectedStock?.symbol} />
+            )}
             {tab === "News & risk" && <NewsRiskPanel token={token} />}
             {tab === "Trade journal" && (
-              <LocalPanels view="Trade journal" token={token} positions={[]} />
+              <TradeJournal
+                token={token}
+                initialSymbol={selectedStock?.symbol}
+              />
             )}
             {tab === "Data status" && <DataStatus token={token} />}
           </>

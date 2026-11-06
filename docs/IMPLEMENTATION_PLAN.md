@@ -1,25 +1,30 @@
 # Living implementation plan
 
 ## Current objective
-Run the implemented product locally using the user's existing native PostgreSQL server and audit the complete proposal. Local application delivery is working; the complete feature scope is not achieved.
+Complete the client research and trading requirements using actual provider data,
+native local PostgreSQL and local Ollama. The complete product is not achieved.
 
-## Completed on 18 September 2026
-- Created dedicated mktechmonk_local database and non-superuser role on native PostgreSQL 14.19.
-- Added TypeORM transactions and active migrations with forced tenant RLS, unique order idempotency, protected audit/executions, cash ledger and sessions.
-- Persisted paper workflows, kill switch, journal, strategy v1 definitions and research runs.
-- Added positions, strategies, options calculator, journal, report history and health screens.
-- Added one-command native local launch and removed PostgreSQL from Docker Compose.
-- Verified concurrency, restart/reconnect persistence, RLS denial, rollback, canonical audit hashes, session revocation and native backup/restore.
-- Produced feature-by-feature proposal audit in FEATURE_AUDIT.md and updated local instructions.
+## Current verified checkpoint — 6 November 2026
+- Current F&O instruments, stock quotes, option chains, six-frame technical
+  charts, streamed provider candles, and source-backed stock research are implemented.
+- Four financial statement sections now feed the UI and Ollama evidence.
+- Shared selected-stock context, source attribution, and structured cash trade
+  plans are implemented. Trade plans do not execute orders.
+- 74 unit tests, typecheck, lint, build and F&O persistence/isolation checks pass.
+  Live dependency and RELIANCE research checks pass. Local services are running.
+- Final browser acceptance is pending after Chrome launch failed in this environment.
 
-## Active next work
-Complete production identity and role permissions, then data ingestion and full broker contracts. The local session mode is not production authentication.
+## Remaining work
+1. Session VWAP and qualified breakout/breakdown rules, full liquidity/spread and
+   restriction checks, sector comparison, regime scoring and ranked trade research.
+2. Delivery, FII/DII, corporate/economic events and remaining international coverage.
+3. Historical derivatives access, rollover and statistically supported thresholds;
+   full backtesting with costs, out-of-sample validation and sufficient history.
+4. Portfolio, broker reconciliation/execution and full risk controls.
+5. Production authentication/permissions, durable monitoring, external alerts,
+   operations and complete client acceptance including market-hours endurance.
 
-## Pending
-See FEATURE_AUDIT.md for the authoritative status of every functional group. In dependency order: identity/MFA; durable events/workers; instrument/calendar/candle providers; three broker implementations and reconciliation; full risk/exits; chart/scanner/options/editor/backtest breadth; ML governance; AI/RAG; licensed news/fundamentals/social; alerts/export/operations; complete UAT.
-
-## Verification
-13 TypeScript and 7 Python tests, lint, type checks and production build pass. Native database and HTTP smoke suites pass. Backup restored into an isolated verification database with matching counts/cash. Browser flows inspected. Standalone Playwright and the full proposal acceptance suite are not claimed complete.
-
-## Limits
-No live execution, licensed feeds or AI provider is active. pgvector/TimescaleDB are not installed. Existing unrelated databases were left unchanged. The original broad brief is preserved in product/MASTER_REQUIREMENTS.md.
+No static fallback prices or invented missing evidence should be displayed.
+Provider credentials alone cannot complete the remaining software requirements.
+See CLIENT_ACCEPTANCE.md for dated evidence and limitations, FEATURE_AUDIT.md
+for the original proposal audit, and product/MASTER_REQUIREMENTS.md for scope.

@@ -444,7 +444,8 @@ footer {
   }
   nav {
     display: flex;
-    overflow: auto;
+    flex-wrap: wrap;
+    gap: 4px;
     margin-top: 14px;
   }
   nav button {

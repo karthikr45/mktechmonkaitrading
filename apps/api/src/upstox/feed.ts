@@ -8,7 +8,66 @@ export const feedType = loadSync(
   resolve(repositoryRoot(), "apps/api/src/upstox/MarketDataFeed.proto"),
 ).lookupType("com.upstox.marketdatafeederv3udapi.rpc.proto.FeedResponse");
 type LTPC = { ltp?: number; ltt?: string; cp?: number };
-type FullMarket = { ltpc?: LTPC; oi?: number; atp?: number; vtt?: string };
+type WireCandle = {
+  interval?: string;
+  open?: number;
+  high?: number;
+  low?: number;
+  close?: number;
+  vol?: string;
+  ts?: string;
+};
+type FullMarket = {
+  ltpc?: LTPC;
+  oi?: number;
+  atp?: number;
+  vtt?: string;
+  marketOHLC?: { ohlc?: WireCandle[] };
+};
+export type StreamCandle = {
+  time: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+};
+export function minuteCandles(
+  rows: WireCandle[] = [],
+  now = Date.now(),
+): StreamCandle[] {
+  return rows
+    .flatMap((r) => {
+      const timestamp = Number(r.ts),
+        volume = Number(r.vol);
+      if (
+        r.interval !== "I1" ||
+        !Number.isSafeInteger(timestamp) ||
+        timestamp <= 0 ||
+        timestamp > now ||
+        r.vol === undefined ||
+        !Number.isSafeInteger(volume) ||
+        volume < 0 ||
+        ![r.open, r.high, r.low, r.close].every(
+          (n) => typeof n === "number" && Number.isFinite(n) && n > 0,
+        ) ||
+        r.high! < Math.max(r.open!, r.close!, r.low!) ||
+        r.low! > Math.min(r.open!, r.close!, r.high!)
+      )
+        return [];
+      return [
+        {
+          time: new Date(timestamp).toISOString(),
+          open: r.open!,
+          high: r.high!,
+          low: r.low!,
+          close: r.close!,
+          volume,
+        },
+      ];
+    })
+    .sort((a, b) => a.time.localeCompare(b.time));
+}
 type WireFeed = {
   type?: string;
   currentTs?: string;
@@ -17,7 +76,10 @@ type WireFeed = {
     string,
     {
       ltpc?: LTPC;
-      fullFeed?: { marketFF?: FullMarket; indexFF?: { ltpc?: LTPC } };
+      fullFeed?: {
+        marketFF?: FullMarket;
+        indexFF?: { ltpc?: LTPC; marketOHLC?: { ohlc?: WireCandle[] } };
+      };
     }
   >;
 };
@@ -27,6 +89,7 @@ export interface Quote {
   previousClose: string | null;
   timestamp: string;
   receivedAt: string;
+  candles?: StreamCandle[];
   openInterest?: number;
   averageTradedPrice?: number;
   tradedVolume?: number;
@@ -113,6 +176,9 @@ export class UpstoxFeed {
   ): Promise<unknown> {
     if (
       !/^\/v3\/historical-candle\/(?:intraday\/)?NSE_EQ%7C[A-Za-z0-9]+\/(?:minutes\/(?:5|15)|hours\/1|days\/1|weeks\/1|months\/1)(?:\/\d{4}-\d{2}-\d{2}\/\d{4}-\d{2}-\d{2})?$/.test(
+        path,
+      ) &&
+      !/^\/v2\/fundamentals\/[A-Z0-9]{12}\/(?:income-statement\?type=consolidated&time_period=(?:yearly|quarterly)|(?:balance-sheet|cash-flow)\?type=consolidated)$/.test(
         path,
       ) &&
       !/^\/v2\/(news\?|market-quote\/quotes\?|option\/(?:chain|contract)\?|historical-candle\/NSE_(?:EQ|FO)%7C[A-Za-z0-9]+\/day\/\d{4}-\d{2}-\d{2}\/\d{4}-\d{2}-\d{2}$|fundamentals\/[A-Z0-9]{12}\/key-ratios$)/.test(
@@ -296,6 +362,9 @@ export class UpstoxFeed {
               )
                 quote.tradedVolume = volume;
             }
+            quote.candles = minuteCandles(
+              (full ?? feed.fullFeed?.indexFF)?.marketOHLC?.ohlc,
+            );
             const previous = this.quotes.get(instrument);
             if (
               previous &&
@@ -305,7 +374,9 @@ export class UpstoxFeed {
                   quote.previousClose === previous.previousClose &&
                   quote.openInterest === previous.openInterest &&
                   quote.averageTradedPrice === previous.averageTradedPrice &&
-                  quote.tradedVolume === previous.tradedVolume))
+                  quote.tradedVolume === previous.tradedVolume &&
+                  JSON.stringify(quote.candles) ===
+                    JSON.stringify(previous.candles)))
             )
               continue;
             this.sequence++;

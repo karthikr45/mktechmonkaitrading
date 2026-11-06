@@ -50,6 +50,34 @@ async function main() {
       }),
       master,
     );
+    const plan = await service.saveTradePlan(t, {
+      symbol: "Fixture",
+      horizon: "intraday",
+      thesis: "Isolated verification plan, not client trading data",
+      side: "BUY",
+      entry: "100",
+      stop: "95",
+      target: "115",
+      quantity: 10,
+      riskBudget: "100",
+      estimatedCosts: "2",
+      adverseSlippage: "0.5",
+    });
+    assert.equal(plan.result.risk.estimatedStopLoss, "57.00");
+    assert.equal(plan.result.state, "plan_only");
+    assert.equal((await service.tradePlans(t))[0].id, plan.id);
+    assert.equal((await service.tradePlans(other)).length, 0);
+    const recovered = new FnoService(
+      store,
+      async () => {
+        throw Error("No provider fetch on saved-plan reads");
+      },
+      master,
+    );
+    assert.equal(
+      (await recovered.tradePlans(t))[0].result.input.thesis,
+      plan.result.input.thesis,
+    );
     await service.save(t, Filters.parse({ priceMove: 2 }));
     assert.equal((await service.settings(t)).filters.priceMove, 2);
     const { id } = await service.start(t);

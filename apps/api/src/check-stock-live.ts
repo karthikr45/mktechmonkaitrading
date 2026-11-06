@@ -35,6 +35,15 @@ async function main() {
         ...("failure" in result.ai ? { failure: result.ai.failure } : {}),
         articles: result.news.length,
         ratios: result.fundamentals.length,
+        financials: result.financials.sections.map((section) => ({
+          section: section.id,
+          state: section.state,
+          periods: [
+            ...new Set(
+              section.rows.flatMap((row) => row.history.map((h) => h.period)),
+            ),
+          ],
+        })),
         findings: result.ai.result?.findings.length,
       }),
     );

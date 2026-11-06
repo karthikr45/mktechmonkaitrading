@@ -1,7 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
 import FnoBacktest from "./FnoBacktest";
-import FnoTechnicals from "./FnoTechnicals";
 type Filters = {
   priceMove: number;
   oiChange: number;
@@ -64,7 +63,13 @@ type Report = Run & {
     marketStrengthScore: null;
   };
 };
-export default function FnoPanel({ token }: { token: string }) {
+export default function FnoPanel({
+  token,
+  initialSymbol = "",
+}: {
+  token: string;
+  initialSymbol?: string;
+}) {
   const percent = (value?: number | null) =>
     value !== undefined && value !== null && Number.isFinite(value)
       ? `${value.toFixed(2)}%`
@@ -131,8 +136,7 @@ export default function FnoPanel({ token }: { token: string }) {
   const active = runs.find((r) => r.state === "running");
   return (
     <div className="outlook">
-      <FnoTechnicals token={token} />
-      <FnoBacktest token={token} />
+      <FnoBacktest token={token} initialSymbol={initialSymbol} />
       <section className="panel">
         <h2>F&O research scanner</h2>
         <p>

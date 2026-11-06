@@ -129,3 +129,72 @@ acceptance. These are not marked complete by passing transport tests.
 Run `pnpm --filter @mk/api exec tsx src/check-stock-live.ts SYMBOL` to exercise
 real stock quotes/chain/completeness, source news/ratios and local AI with saved
 research evidence. Credentials and `.env` stay local.
+
+## Client workflow repair — 3 November 2026
+
+- Selected stock context is shared across Stock workspace, Charts & indicators,
+  Live prices and historical-study entry. The duplicate technical form was removed
+  from the scanner screen. Context is retained during menu navigation, not browser reload.
+- Selecting a stock subscribes its actual cash and nearest futures instruments.
+  The selected-stock panel filters unrelated shared-feed quotes and labels cash
+  and futures clearly. Streaming subscription uses configured local credentials;
+  it never places an order. The tenant feed is shared: changing subscriptions in
+  another tab may require reconnecting the desired stock.
+- Global quote observations carry their provider identity into newly generated
+  AI evidence. Older saved reports are historical and are not rewritten.
+- News links replace raw citation IDs in stock research. The AI prompt explicitly
+  rejects inferring bullish sentiment/writing from OI magnitude alone. This is a
+  generation constraint, not independent factual verification.
+- International headline URLs are deduplicated before display. The alert inbox
+  initially shows the five most recent outstanding alerts; older warnings remain
+  accessible through Show all. Mobile navigation wraps instead of hiding menus.
+- Six-frame technical reports include EMA 10/20/50/100/200 alignment, EMA50/200
+  crossovers and MACD/signal crossovers from the last two completed observations.
+  Insufficient warmup is explicit. These are not qualified trade recommendations.
+- Verification: provider readiness passed PostgreSQL, Upstox sample, global sample
+  and local Ollama inference. Real RELIANCE research returned 49 matched strikes,
+  nine articles, seven ratios and three generated findings with no snapshot
+  failures. Browser checks verified stock-specific feed instruments and stock
+  continuity into charts and backtests. Equity markets were closed during checks.
+
+Full release remains open: session VWAP/breakout logic, all liquidity/restriction
+checks, complete market regime and rankings, delivery/FII/DII/events, long-term
+fundamentals, rollover analysis, full historical backtesting, portfolio/execution
+and market-hours endurance still require implementation and acceptance. No new
+credentials alone resolve those software gaps.
+
+
+## Verified implementation checkpoint — 6 November 2026
+
+- Live-price panels now render provider-supplied one-minute OHLC/volume bars.
+  Updates merge by timestamp, retain up to 120 observed bars and do not fill gaps.
+  Old candles are labeled; initial subscriptions do not reconstruct a full session.
+- The Trade journal accepts cash-equity plans with trader-entered entry, stop,
+  target, quantity, costs, slippage and risk budget. Server-side calculations
+  include costs/slippage in loss and reward, retain the provider snapshot, and
+  persist with tenant isolation. These plans do not place orders or validate
+  derivatives lots, margin, funds or trade eligibility.
+- Stock research fetches annual and quarterly consolidated income statements,
+  annual balance sheets and cash flows through existing Upstox access. Values
+  retain provider reporting periods and INR-crore units; missing sections stay
+  unavailable. Ollama receives these statements as cited evidence.
+- Actual RELIANCE acceptance returned all four statement sections: annual
+  periods March 2023–March 2026, quarterly periods September 2025–June 2026.
+  The latest returned quarter is not asserted to be the latest filed quarter.
+  The same run returned 50 matched option strikes, two recent articles, seven
+  ratios and three Ollama findings, with no snapshot failures.
+- Validation: 74 unit tests, TypeScript checks, lint, production build and
+  F&O database integration passed. Dependency checks passed PostgreSQL,
+  Upstox authentication, one global quote and local Ollama inference. Local
+  web/API/analytics health passed after starting the production build.
+- Browser acceptance of this final build remains unverified: Chrome terminated
+  during headless launch in the execution environment. Earlier browser checks
+  above apply only to their stated checkpoint, not these final changes.
+
+This checkpoint is not full client acceptance. Session VWAP, complete liquidity
+and restriction filters, regime scoring/ranking, delivery/FII/DII/events,
+rollover, historical threshold validation, complete historical backtesting,
+portfolio and live execution remain open. International data coverage is partial.
+Expired-contract access previously required Upstox Plus and has not been
+reconfirmed. Fundamentals now have provider history, but filing reconciliation
+and verification against the latest published results remain open.

@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { completed, indicators, chartSeries } from "./technicals";
+import { completed, indicators, chartSeries, crossover } from "./technicals";
 import type { Candle } from "./analytics";
 const bar = (date: string): Candle => [date, 100, 100, 100, 100, 1000, 0];
 it("charts retain actual OHLCV and use earlier history for overlay warmup", () => {
@@ -57,4 +57,26 @@ it("removes developing intraday, weekly and monthly bars in IST", () => {
       now,
     ),
   ).toHaveLength(1);
+});
+
+it("distinguishes a completed crossover from a continuing trend or absent history", () => {
+  expect(crossover(-1, 2)).toBe("Bullish crossover");
+  expect(crossover(1, -2)).toBe("Bearish crossover");
+  expect(crossover(1, 2)).toBe("No new crossover");
+  expect(crossover(0, 0)).toBe("No new crossover");
+  expect(crossover(null, 2)).toBe("Insufficient history");
+  const rising = Array.from({ length: 220 }, (_, i): Candle => [
+    new Date(Date.UTC(2025, 0, i + 1)).toISOString(),
+    100 + i,
+    100 + i,
+    100 + i,
+    100 + i,
+    1000,
+    0,
+  ]);
+  expect(indicators(rising).emaAlignment).toBe("Bullish alignment");
+  expect(indicators(rising).ema50x200).toBe("No new crossover");
+  expect(indicators(rising.slice(0, 100)).emaAlignment).toBe(
+    "Insufficient history",
+  );
 });

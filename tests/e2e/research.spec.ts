@@ -10,6 +10,9 @@ test("client workspace contains research tools and no synthetic trading dashboar
   });
   await page.goto("/");
   await expect(
+    page.getByRole("heading", { name: "Trading day", exact: true }),
+  ).toBeVisible();
+  await expect(
     page.getByRole("button", { name: "Charts & indicators", exact: true }),
   ).toBeVisible();
   await expect(
@@ -23,7 +26,7 @@ test("client workspace contains research tools and no synthetic trading dashboar
     page.getByRole("heading", { name: "Charts & indicators", exact: true }),
   ).toBeVisible();
   await page
-    .getByRole("button", { name: "Trade journal", exact: true })
+    .getByRole("button", { name: "Plan & journal", exact: true })
     .click();
   await expect(
     page.getByRole("button", { name: "Save journal note" }),

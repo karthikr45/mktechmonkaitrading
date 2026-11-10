@@ -8,55 +8,71 @@ import RealtimePanel from "./RealtimePanel";
 import TradeJournal from "./TradeJournal";
 import StockWorkspace from "./StockWorkspace";
 import DataStatus from "./DataStatus";
+import TradingDay from "./TradingDay";
+import FnoBacktest from "./FnoBacktest";
 const menus = [
   [
-    "Stock workspace",
-    "Stock workspace",
-    "Select a stock once to review its price, futures OI, option chain and technical charts.",
+    "Today",
+    "Trading day",
+    "Your daily starting point: market context, news, attention items and the next step.",
   ],
   [
-    "Today",
-    "Today",
-    "Start with market context, check news and risks, then investigate a stock.",
+    "F&O scanner",
+    "Find stocks",
+    "Scan current F&O stocks for price and OI observations. Results are not qualified trade recommendations.",
+  ],
+  [
+    "Stock workspace",
+    "Stock analysis",
+    "Choose a stock and review price, derivatives, financial statements and source-linked AI research.",
   ],
   [
     "Market charts",
     "Charts & indicators",
-    "Study provider candles across six timeframes with EMA, RSI, MACD, ADX and volume. Completed candles refresh on request or every minute when enabled.",
+    "Inspect six timeframes and completed-candle indicators for your selected stock.",
+  ],
+  [
+    "Backtest",
+    "Backtest",
+    "Evaluate fixed price/OI rules on available daily futures history. Review costs and sample limits.",
+  ],
+  [
+    "Trade journal",
+    "Plan & journal",
+    "Define your entry, invalidation, target and loss budget. Save your reasoning and review notes.",
   ],
   [
     "Real-time market",
-    "Live prices",
-    "Connect to Upstox for streaming prices. Check the last-trade time and exchange status before acting.",
-  ],
-  [
-    "F&O scanner",
-    "F&O research & backtests",
-    "Compare price, futures OI and option-chain evidence, then test fixed rules on available historical futures data.",
+    "Monitor",
+    "Watch provider prices and candles. This is market monitoring, not a broker positions screen.",
   ],
   [
     "News & risk",
-    "News & AI research",
-    "Read sourced news, coverage warnings and evidence-linked Ollama analysis. Missing evidence is shown explicitly.",
+    "News & alerts",
+    "Read Indian and world news, review source coverage and manage your daily checklist.",
   ],
   [
     "Global markets",
-    "Global markets",
-    "Review international market context. Upstox indices and Twelve Data stocks/FX use separate refresh schedules. Timestamps and coverage identify what is available.",
-  ],
-  [
-    "Trade journal",
-    "Trade journal",
-    "Save your thesis, risk plan and review notes in your local database.",
+    "World markets",
+    "Compare India, US, Asia-Pacific, Europe, currencies and the seven US technology stocks.",
   ],
   [
     "Data status",
-    "Data & AI status",
-    "Check actual service availability. Connected services do not guarantee complete exchange coverage or a successful research report.",
+    "Connections",
+    "Check Upstox, global data and local AI. Review ICICI Direct onboarding requirements.",
   ],
 ];
+const nextSteps: Record<string, [string, string]> = {
+  "F&O scanner": ["Stock workspace", "Next: investigate a stock"],
+  "Stock workspace": ["Market charts", "Next: inspect the chart"],
+  "Market charts": ["Backtest", "Next: test historical rules"],
+  Backtest: ["Trade journal", "Next: write a risk plan"],
+  "Trade journal": ["Real-time market", "Next: monitor prices"],
+  "Real-time market": ["Trade journal", "Review your plan & journal"],
+  "News & risk": ["Stock workspace", "Next: investigate a stock"],
+};
 export default function Page() {
-  const [tab, setTab] = useState("Stock workspace");
+  const [tab, setTab] = useState("Today");
   const [token, setToken] = useState("");
   const [selectedStock, setSelectedStock] = useState<{
     symbol: string;
@@ -88,8 +104,8 @@ export default function Page() {
         <a className="brand" href="/">
           MKTechMonk
         </a>
-        <p className="muted">Market research & decision support</p>
-        <nav aria-label="Research tools">
+        <p className="muted">Your trading day, step by step</p>
+        <nav aria-label="Daily trading workflow">
           {menus.map(([id, label]) => (
             <button
               key={id}
@@ -114,7 +130,14 @@ export default function Page() {
             {light ? "Dark" : "Light"} theme
           </button>
         </header>
-        <h1>{menu[1]}</h1>
+        <div className="pageHeading">
+          <h1>{menu[1]}</h1>
+          {nextSteps[tab] && (
+            <button onClick={() => setTab(nextSteps[tab][0])}>
+              {nextSteps[tab][1]} →
+            </button>
+          )}
+        </div>
         {selectedStock && (
           <p className="stockContext">
             Selected stock: <strong>{selectedStock.symbol}</strong> ·{" "}
@@ -138,7 +161,7 @@ export default function Page() {
               />
             )}
             {tab === "Today" && (
-              <GlobalOutlook token={token} compact onNavigate={setTab} />
+              <TradingDay token={token} onNavigate={setTab} />
             )}
             {tab === "Global markets" && (
               <GlobalOutlook token={token} onNavigate={setTab} />
@@ -168,7 +191,19 @@ export default function Page() {
               />
             )}
             {tab === "F&O scanner" && (
-              <FnoPanel token={token} initialSymbol={selectedStock?.symbol} />
+              <FnoPanel
+                token={token}
+                onInvestigate={(stock) => {
+                  setSelectedStock(stock);
+                  setTab("Stock workspace");
+                }}
+              />
+            )}
+            {tab === "Backtest" && (
+              <FnoBacktest
+                token={token}
+                initialSymbol={selectedStock?.symbol}
+              />
             )}
             {tab === "News & risk" && <NewsRiskPanel token={token} />}
             {tab === "Trade journal" && (

@@ -43,7 +43,7 @@ export default function GlobalOutlook({
 }) {
   const [data, setData] = useState<Outlook>();
   const [error, setError] = useState("");
-  const [group, setGroup] = useState("US");
+  const [group, setGroup] = useState("India");
   const [tasks, setTasks] = useState<{ title: string; state: string }[]>([]);
   useEffect(() => {
     let active = true;
@@ -185,6 +185,21 @@ export default function GlobalOutlook({
             Green means price up; it does not mean favourable for India. FX,
             yields and volatility require separate interpretation.
           </p>
+          <div
+            className="outlookActions"
+            role="group"
+            aria-label="Market regions"
+          >
+            {[...new Set(data.quotes.map((q) => q.group))].map((g) => (
+              <button
+                key={g}
+                aria-pressed={group === g}
+                onClick={() => setGroup(g)}
+              >
+                {g}
+              </button>
+            ))}
+          </div>
           <label>
             Region or asset group{" "}
             <select value={group} onChange={(e) => setGroup(e.target.value)}>
@@ -232,7 +247,7 @@ export default function GlobalOutlook({
                           : `${q.changePct > 0 ? "+" : ""}${q.changePct.toFixed(2)}%`}
                       </td>
                       <td>
-                        {q.reason ?? q.session}{" "}
+                        {q.reason ?? q.session ?? q.state}{" "}
                         {q.state === "stale" ? "· Stale" : ""}
                       </td>
                       <td>

@@ -198,3 +198,18 @@ portfolio and live execution remain open. International data coverage is partial
 Expired-contract access previously required Upstox Plus and has not been
 reconfirmed. Fundamentals now have provider history, but filing reconciliation
 and verification against the latest published results remain open.
+
+## Daily workflow redesign — 10 November 2026
+Trading day is now the landing screen. It displays actual saved briefing,
+alerts and checklist state, plus provider-backed global market context. Menus
+follow preparation, stock investigation, historical study, planning, monitoring
+and review. Backtesting is separate from scanning, scanner detail links to current
+stock analysis, and research screens expose next-step navigation. Region buttons
+surface India, US, Asia-Pacific, Europe, currencies and US technology groups.
+Connections explicitly identifies Breeze as unimplemented and awaiting an account.
+
+Build, lint and 74 unit tests passed. Restarted web/API/analytics health checks
+passed. HTTP acceptance confirmed landing content and authenticated briefing and
+218-symbol universe responses. Visual/mobile browser acceptance remains outstanding.
+This is a workflow redesign, not completion of missing signal/execution features.
+See DAILY_WORKFLOW.md for screen responsibilities and remaining gates.

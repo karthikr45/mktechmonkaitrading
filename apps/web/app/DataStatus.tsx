@@ -31,7 +31,28 @@ export default function DataStatus({ token }: { token: string }) {
   }, [token]);
   return (
     <section className="panel">
-      <h2>Measured connection status</h2>
+      <h2>Broker & data connections</h2>
+      <div className="brokerSetup">
+        <h3>ICICI Direct · Breeze</h3>
+        <p>
+          Not connected. An ICICI Direct trading account, registered Breeze app
+          and authenticated session are required. The Breeze adapter is not
+          implemented; entering a key will not activate it yet.
+        </p>
+        <a
+          href="https://api.icicidirect.com/apiuser/home"
+          target="_blank"
+          rel="noreferrer"
+        >
+          Open official Breeze registration ↗
+        </a>
+        <p className="muted">
+          Keep credentials in your local .env. Upstox remains the active
+          integration. Neither connection currently submits live orders from
+          this application.
+        </p>
+      </div>
+      <h3>Measured service status</h3>
       {error && <p role="alert">{error}</p>}
       {!data && !error && <p>Checking services…</p>}
       {data && (

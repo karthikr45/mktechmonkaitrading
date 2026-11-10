@@ -1,6 +1,5 @@
 "use client";
 import { useEffect, useState } from "react";
-import FnoBacktest from "./FnoBacktest";
 type Filters = {
   priceMove: number;
   oiChange: number;
@@ -22,6 +21,7 @@ type Run = {
   };
 };
 type Stock = {
+  future?: string;
   key: string;
   symbol: string;
   decision: string;
@@ -65,10 +65,14 @@ type Report = Run & {
 };
 export default function FnoPanel({
   token,
-  initialSymbol = "",
+  onInvestigate,
 }: {
   token: string;
-  initialSymbol?: string;
+  onInvestigate?: (stock: {
+    symbol: string;
+    key: string;
+    future: string;
+  }) => void;
 }) {
   const percent = (value?: number | null) =>
     value !== undefined && value !== null && Number.isFinite(value)
@@ -136,7 +140,6 @@ export default function FnoPanel({
   const active = runs.find((r) => r.state === "running");
   return (
     <div className="outlook">
-      <FnoBacktest token={token} initialSymbol={initialSymbol} />
       <section className="panel">
         <h2>F&O research scanner</h2>
         <p>
@@ -336,6 +339,19 @@ export default function FnoPanel({
       {stock && (
         <section className="panel">
           <h2>{stock.symbol} · saved research</h2>
+          {stock.future && onInvestigate && (
+            <button
+              onClick={() =>
+                onInvestigate({
+                  symbol: stock.symbol,
+                  key: stock.key,
+                  future: stock.future!,
+                })
+              }
+            >
+              Investigate {stock.symbol} with current data →
+            </button>
+          )}
           <p>{stock.reason}</p>
           <p>
             Observation: {stock.asOf ?? "Unavailable"} · Cash price:{" "}

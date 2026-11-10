@@ -655,3 +655,124 @@ textarea {
     grid-template-columns: 1fr;
   }
 }
+
+/* Daily workflow: actions first, evidence and freshness alongside decisions. */
+.pageHeading,
+.dayHero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+.dayHero {
+  padding: 28px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: linear-gradient(115deg, var(--panel), var(--bg));
+  margin: 24px 0;
+}
+.dayHero h2 {
+  font-size: 30px;
+  letter-spacing: -0.8px;
+  margin: 8px 0;
+}
+.dayHero p {
+  max-width: 650px;
+  line-height: 1.6;
+}
+.primaryAction {
+  background: #45d8b3;
+  color: #10251e;
+  border: 0;
+  padding: 14px 20px;
+  border-radius: 9px;
+  font-weight: 700;
+}
+.dailySteps {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 24px;
+}
+.stepCard {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 18px;
+  background: var(--panel);
+  display: flex;
+  flex-direction: column;
+}
+.stepNumber {
+  color: var(--muted);
+  font-size: 12px;
+  letter-spacing: 2px;
+}
+.stepCard h3 {
+  margin: 12px 0 4px;
+}
+.stepCard p {
+  color: var(--muted);
+  line-height: 1.55;
+  flex: 1;
+}
+.stepCard button {
+  text-align: left;
+  line-height: 1.45;
+}
+.dayColumns {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 20px;
+}
+.attentionItem {
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+.attentionItem p {
+  margin: 6px 0;
+  line-height: 1.5;
+}
+.dataWarning {
+  border-left: 3px solid #e4b45d;
+  padding: 10px 14px;
+}
+.brokerSetup {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 18px;
+  margin: 20px 0;
+}
+.brokerSetup a {
+  color: var(--text);
+  text-decoration: underline;
+}
+@media (max-width: 1250px) {
+  .dailySteps {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 800px) {
+  .dayColumns {
+    grid-template-columns: 1fr;
+  }
+  .dailySteps {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .pageHeading,
+  .dayHero {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+@media (max-width: 480px) {
+  .dailySteps {
+    grid-template-columns: 1fr;
+  }
+  .dayHero {
+    padding: 18px;
+  }
+  .dayHero h2 {
+    font-size: 25px;
+  }
+}
